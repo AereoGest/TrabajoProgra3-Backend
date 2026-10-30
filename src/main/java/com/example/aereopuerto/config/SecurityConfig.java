@@ -53,8 +53,6 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.GET, "/api/reservas",
                                                 "/api/reservas/filtrar",
-                                                "/api/asistenciasAlViajero",
-                                                "/api/equipajes",
                                                 "/api/pasajes",
                                                 "/api/pasajes/{id}",
                                                 "/api/personas",
@@ -65,19 +63,24 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 HttpMethod.POST, "/api/vuelos",
-                                                "/api/pasajes"
+                                                "/api/pasajes",
+                                                "/api/equipajes",
+                                                "/api/asistenciasAlViajero"
                         ).hasRole("ADMIN")
 
                         .requestMatchers(
                                 HttpMethod.PUT, "/api/vuelos/{id}",
                                                 "/api/personas/{id}",
                                                 "/api/facturas/{id}",
-                                                "/api/pasajes/{id}"
+                                                "/api/pasajes/{id}",
+                                                "/api/equipajes/{id}",
+                                                "/api/asistenciasAlViajero/{id}"
                         ).hasRole("ADMIN")
 
                         .requestMatchers(
                                 HttpMethod.DELETE,"/api/reservas/{id}",
-                                                  "/api/asistenciasAlViajero",
+                                                  "/api/asistenciasAlViajero/{id}",
+                                                  "/api/equipajes/{id}",
                                                   "/api/vuelos/{id}",
                                                   "/api/personas/{id}",
                                                   "/api/facturas/{id}",
@@ -151,8 +154,9 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
-                "http://localhost:5173",
+                "http://localhost:62079",
                 "http://127.0.0.1:5173",
+                "http://localhost:5173",
                 "http://localhost:4200",
                 "http://127.0.0.1:4200",
                 "https://aerogest.ddns.net"

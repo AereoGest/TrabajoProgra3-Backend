@@ -11,6 +11,6 @@ public enum ClasesVuelo {
     @JsonCreator
     public static ClasesVuelo fromString(String value) {
         if (value == null) return null;
-        return ClasesVuelo.valueOf(value.toLowerCase());
+        return ClasesVuelo.valueOf(value.toUpperCase());
     }
 }

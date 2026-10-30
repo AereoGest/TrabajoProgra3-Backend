@@ -9,6 +9,6 @@ public enum TipoEquipaje {
     @JsonCreator
     public static TipoEquipaje fromString(String value) {
         if (value == null) return null;
-        return TipoEquipaje.valueOf(value.toLowerCase());
+        return TipoEquipaje.valueOf(value.toUpperCase());
     }
 }

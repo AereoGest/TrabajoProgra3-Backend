@@ -11,4 +11,5 @@ import java.util.List;
 @Repository
 public interface ReservaRepository extends JpaRepository<Reserva, Integer>, JpaSpecificationExecutor<Reserva> {
     List<Reserva> findByPersona(Persona persona);
+    boolean existsByCodigoReserva (String codigoReserva);
 }

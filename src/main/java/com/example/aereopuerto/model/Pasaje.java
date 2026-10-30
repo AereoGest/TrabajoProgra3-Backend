@@ -2,14 +2,14 @@ package com.example.aereopuerto.model;
 
 
 import com.example.aereopuerto.model.enums.ClasesVuelo;
+import com.example.aereopuerto.model.enums.Identificador;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import javax.print.attribute.standard.MediaSize;
 import java.io.Serializable;
+import java.time.LocalDate;
 import java.util.List;
 
 @Entity
@@ -52,10 +52,32 @@ public class Pasaje implements Serializable {
 
     @ManyToOne
     @JoinColumn(name = "reserva_id", nullable = false)
+    @JsonIgnore
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Reserva reserva;
 
     @ManyToOne
     @JoinColumn(name = "asiento_id")
     private Asiento asiento;
+
+    @Column(nullable = false, length = 100)
+    private String nombre;
+
+    @Column(nullable = false, length = 100)
+    private String apellido;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_documento", length = 20)
+    private Identificador tipoDocumento;
+
+    @Column(nullable = false, length = 20)
+    private String documento;
+
+    @Column(name = "fecha_nacimiento")
+    private LocalDate fechaNacimiento;
+
+    @Column(length = 100)
+    private String email;
 
 }

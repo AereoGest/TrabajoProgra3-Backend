@@ -33,6 +33,10 @@ public class EquipajeService {
     @CachePut(value = "equipajes", key = "#result.id")
     @CacheEvict(value = "equipajes", key = "'todos'")
     public Equipaje crearEquipaje(Equipaje equipaje) {
+        // hay un solo registro por tipo: para cambiar peso o precio se edita el existente
+        if (equipajeRepository.existsByTipo(equipaje.getTipo())) {
+            throw new IllegalArgumentException("Ya existe un equipaje de tipo " + equipaje.getTipo() + ". Editá el existente.");
+        }
         return equipajeRepository.save(equipaje);
     }
 
@@ -43,8 +47,13 @@ public class EquipajeService {
         Equipaje e = equipajeRepository.findById(id)
                 .orElseThrow(() -> new EquipajeInvalidoException("Equipaje no encontrado. ID: " + id));
 
+        if (equipajeRepository.existsByTipoAndIdNot(equipaje.getTipo(), id)) {
+            throw new IllegalArgumentException("Ya existe un equipaje de tipo " + equipaje.getTipo() + ".");
+        }
+
         e.setPeso(equipaje.getPeso());
         e.setTipo(equipaje.getTipo());
+        e.setPrecio(equipaje.getPrecio());
 
         return equipajeRepository.save(e);
     }

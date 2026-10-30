@@ -1,7 +1,10 @@
 package com.example.aereopuerto.controller;
 
 import com.example.aereopuerto.auth.entity.User;
+import com.example.aereopuerto.dto.PagoRequest;
+import com.example.aereopuerto.dto.PagoResponse;
 import com.example.aereopuerto.dto.ReservaDTO;
+import com.example.aereopuerto.dto.ReservaRequest;
 import com.example.aereopuerto.model.Reserva;
 import com.example.aereopuerto.model.enums.EstadoReserva;
 import com.example.aereopuerto.service.ReservaService;
@@ -10,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -59,9 +63,28 @@ public class ReservaController {
     @Operation(summary = "Crear reserva", description = "Registra una nueva reserva.")
     @PostMapping
     @PreAuthorize("hasAnyRole('EMPLEADO', 'ADMIN')")
-    public ResponseEntity<Reserva> crearReserva(@RequestBody Reserva reserva) {
+    public ResponseEntity<Reserva> crearReserva(@Valid @RequestBody ReservaRequest reserva) {
         Reserva nueva = reservaService.crearReserva(reserva);
         return ResponseEntity.status(HttpStatus.CREATED).body(nueva);
+    }
+
+    @Operation(summary = "Crear mi reserva", description = "El cliente autenticado crea una reserva a su nombre.")
+    @PostMapping("/mis-reservas")
+    public ResponseEntity<Reserva> crearMiReserva(
+            @AuthenticationPrincipal User usuarioAutenticado,
+            @Valid @RequestBody ReservaRequest request) {
+        request.setPersonaId(usuarioAutenticado.getPersona().getId());
+        Reserva nueva = reservaService.crearReserva(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(nueva);
+    }
+
+    @Operation(summary = "Pagar mi reserva", description = "Cobra la reserva en Mercado Pago y la confirma si el pago es aprobado.")
+    @PostMapping("/mis-reservas/{id}/pagar")
+    public ResponseEntity<PagoResponse> pagarMiReserva(
+            @PathVariable Integer id,
+            @AuthenticationPrincipal User usuarioAutenticado,
+            @Valid @RequestBody PagoRequest request) {
+        return ResponseEntity.ok(reservaService.pagarReserva(id, request, usuarioAutenticado));
     }
 
     @Operation(summary = "Actualizar reserva", description = "Actualiza una reserva existente.")

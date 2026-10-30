@@ -7,6 +7,8 @@ import lombok.*;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Data
@@ -23,6 +25,12 @@ public class Reserva implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "reserva_id")
     private Integer id;
+
+    @Column(name = "codigo_reserva", unique = true, length = 20)
+    private String codigoReserva;
+
+    @Column(name = "mercado_pago_id")
+    private Long mercadoPagoId;
 
     @ManyToOne
     @JoinColumn(name = "persona_id", nullable = false)
@@ -41,6 +49,17 @@ public class Reserva implements Serializable {
     @Column(nullable = false, name="fecha_reserva")
     private LocalDateTime fechaReserva;
 
+    @OneToMany(mappedBy = "reserva", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<Pasaje> pasajes = new ArrayList<>();
+
+    public void agregarPasaje(Pasaje pasaje) {
+        pasajes.add(pasaje);
+        pasaje.setReserva(this);
+        this.cantidadPasajes = pasajes.size();
+    }
 
 
 }

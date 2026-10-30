@@ -81,6 +81,11 @@ public class GlobalExceptions {
         return build(HttpStatus.METHOD_NOT_ALLOWED, "Método no permitido: " + ex.getMethod(), request);
     }
 
+    @ExceptionHandler(PagoException.class)
+    public ResponseEntity<ErrorResponse> pagoError(PagoException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_GATEWAY, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> conflict(DataIntegrityViolationException ex, HttpServletRequest request) {
         return build(HttpStatus.CONFLICT, "Ya existe un registro con esos datos", request);

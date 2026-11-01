@@ -96,6 +96,12 @@ public class ReservaService {
                 .orElseThrow(() -> new PersonaInvalidaException(
                         "Usuario no encontrado. ID: " + request.getPersonaId()));
 
+        userRepository.findByPersonaId(persona.getId()).ifPresent(u -> {
+            if (!Boolean.TRUE.equals(u.getIsVerified())) {
+                throw new ReservaInvalidaException("Debes verificar tu cuenta de correo electrónico antes de realizar una reserva.");
+            }
+        });
+
         Vuelo vuelo = vueloRepository.findById(request.getVueloId())
                 .orElseThrow(() -> new ReservaInvalidaException(
                         "Vuelo no encontrado. ID: " + request.getVueloId()));

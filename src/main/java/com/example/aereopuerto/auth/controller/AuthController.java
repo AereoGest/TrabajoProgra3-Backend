@@ -150,6 +150,17 @@ public class AuthController {
         return res;
     }
 
+    @Operation(
+            summary = "Reenviar email de verificación",
+            description = "Envía un nuevo enlace de verificación a la casilla del usuario."
+    )
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Map<String, String>> resendVerification(@RequestBody(required = false) Map<String, String> request) {
+        String email = request != null ? request.get("email") : null;
+        authService.resendVerificationEmail(email);
+        return ResponseEntity.ok(Map.of("message", "Si la cuenta existe y no está verificada, se ha enviado un correo de verificación."));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException exception) {
         return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));

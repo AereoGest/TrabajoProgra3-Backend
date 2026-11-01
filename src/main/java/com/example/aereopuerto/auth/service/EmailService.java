@@ -1,6 +1,7 @@
 package com.example.aereopuerto.auth.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
@@ -12,13 +13,16 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
+    @Value("${app.frontend.url:https://aerogest.ddns.net}")
+    private String frontendUrl;
+
     @Async
     public void sendVerificationEmail(String toEmail, String verificationToken) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);
         message.setSubject("Verificación de Cuenta - Aerolínea");
         
-        String verificationUrl = "https://aerogest.ddns.net/verify.html?token=" + verificationToken;
+        String verificationUrl = frontendUrl + "/verify?token=" + verificationToken;
         
         message.setText("Hola,\n\n" +
                 "Gracias por registrarte en nuestra plataforma. " +
@@ -35,7 +39,7 @@ public class EmailService {
         message.setTo(toEmail);
         message.setSubject("Restablecer Contraseña - Aerolínea");
 
-        String resetUrl = "https://aerogest.ddns.net/reset-password.html?token=" + resetToken;
+        String resetUrl = frontendUrl + "/reset-password?token=" + resetToken;
 
         message.setText("Hola,\n\n" +
                 "Recibimos una solicitud para restablecer tu contraseña. " +

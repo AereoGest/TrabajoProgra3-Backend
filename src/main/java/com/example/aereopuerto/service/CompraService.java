@@ -39,6 +39,9 @@ public class CompraService {
     private Double tasaImpuesto;
 
     public String confirmarCompra(CompraDTO dto, User usuarioAutenticado) {
+        if (usuarioAutenticado != null && !Boolean.TRUE.equals(usuarioAutenticado.getIsVerified())) {
+            throw new IllegalArgumentException("Debes verificar tu cuenta de correo electrónico antes de realizar compras.");
+        }
         Carrito carrito = obtenerCarrito(usuarioAutenticado.getPersona().getId());
         validarCarrito(carrito);
         validarDisponibilidad(carrito);

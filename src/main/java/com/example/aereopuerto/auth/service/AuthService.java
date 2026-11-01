@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-import java.util.Random;
+import java.security.SecureRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +29,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final EmailService emailService;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(
@@ -39,8 +40,9 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
         if (Boolean.TRUE.equals(user.getTwoFactorEnabled())) {
-            String code = String.format("%06d", new Random().nextInt(999999));
+            String code = String.format("%06d", secureRandom.nextInt(1_000_000));
             user.setTwoFactorCode(code);
+            user.setTwoFactorCodeExpiry(LocalDateTime.now().plusMinutes(10));
             userRepository.save(user);
             emailService.sendTwoFactorCode(user.getEmail(), code);
             
@@ -57,6 +59,9 @@ public class AuthService {
                 .userId(user.getId())
                 .perfilCompleto(user.getPerfilCompleto())
                 .requires2fa(false)
+                .role(user.getRole() != null ? user.getRole().name() : null)
+                .isVerified(user.getIsVerified())
+
                 .build();
     }
 
@@ -98,6 +103,9 @@ public class AuthService {
                 .userId(user.getId())
                 .perfilCompleto(user.getPerfilCompleto())
                 .requires2fa(false)
+                .role(user.getRole() != null ? user.getRole().name() : null)
+                .isVerified(user.getIsVerified())
+
                 .build();
     }
 
@@ -124,9 +132,11 @@ public class AuthService {
                 .identificador(persona.getIdentificador())
                 .fechaNacimiento(persona.getFechaNacimiento())
                 .sexo(persona.getSexo())
-                .twoFactorEnabled(user.getTwoFactorEnabled())
                 .isVerified(user.getIsVerified())
                 .role(user.getRole().name())
+                .isVerified(user.getIsVerified())
+
+
                 .build();
     }
 
@@ -208,6 +218,9 @@ public class AuthService {
                 .userId(user.getId())
                 .perfilCompleto(true)
                 .requires2fa(false)
+                .role(user.getRole() != null ? user.getRole().name() : null)
+                .isVerified(user.getIsVerified())
+
                 .build());
 
     }
@@ -257,7 +270,10 @@ public class AuthService {
                 .userId(user.getId())
                 .perfilCompleto(true)
                 .requires2fa(false)
-                .role(user.getRole().name())
+                .role(user.getRole() != null ? user.getRole().name() : null)
+                .isVerified(user.getIsVerified())
+
+
                 .build());
     }
 
@@ -277,7 +293,10 @@ public class AuthService {
     }
 
     public AuthResponse verifyEmail(String token) {
-        User user = userRepository.findByVerificationToken(token)
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("Token de verificación inválido o ausente");
+        }
+        User user = userRepository.findByVerificationToken(token.trim())
                 .orElseThrow(() -> new IllegalArgumentException("Token inválido"));
 
         user.setIsVerified(true);
@@ -291,6 +310,9 @@ public class AuthService {
                 .userId(user.getId())
                 .perfilCompleto(user.getPerfilCompleto())
                 .requires2fa(false)
+                .role(user.getRole() != null ? user.getRole().name() : null)
+                .isVerified(user.getIsVerified())
+
                 .build();
     }
 
@@ -298,11 +320,15 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        if (!request.getCode().equals(user.getTwoFactorCode())) {
+        if (user.getTwoFactorCode() == null || user.getTwoFactorCodeExpiry() == null || user.getTwoFactorCodeExpiry().isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("El código 2FA ha expirado o no es válido. Vuelve a iniciar sesión.");
+        }
+        if (!request.getCode().trim().equals(user.getTwoFactorCode())) {
             throw new IllegalArgumentException("Código 2FA incorrecto");
         }
 
         user.setTwoFactorCode(null);
+        user.setTwoFactorCodeExpiry(null);
         userRepository.save(user);
 
         String token = jwtService.generateToken(user, user.getId());
@@ -312,7 +338,34 @@ public class AuthService {
                 .userId(user.getId())
                 .perfilCompleto(user.getPerfilCompleto())
                 .requires2fa(false)
+                .role(user.getRole() != null ? user.getRole().name() : null)
+                .isVerified(user.getIsVerified())
+
                 .build();
+    }
+
+    public void resendVerificationEmail(String email) {
+        String targetEmail = email;
+        if (targetEmail == null || targetEmail.isBlank()) {
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+                targetEmail = auth.getName();
+            }
+        }
+        if (targetEmail == null || targetEmail.isBlank()) {
+            throw new IllegalArgumentException("El correo electrónico es obligatorio");
+        }
+
+        User user = userRepository.findByEmail(targetEmail.trim())
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        if (Boolean.TRUE.equals(user.getIsVerified())) {
+            throw new IllegalArgumentException("La cuenta ya se encuentra verificada.");
+        }
+        String newToken = UUID.randomUUID().toString();
+        user.setVerificationToken(newToken);
+        userRepository.save(user);
+        emailService.sendVerificationEmail(user.getEmail(), newToken);
     }
 
     public void forgotPassword(ForgotPasswordRequest request) {
@@ -327,7 +380,13 @@ public class AuthService {
     }
 
     public void resetPassword(ResetPasswordRequest request) {
-        User user = userRepository.findByResetToken(request.getToken())
+        if (request == null || request.getToken() == null || request.getToken().trim().isEmpty()) {
+            throw new IllegalArgumentException("Token de restablecimiento inválido o ausente");
+        }
+        if (request.getNewPassword() == null || request.getNewPassword().length() < 8) {
+            throw new IllegalArgumentException("La contraseña debe tener al menos 8 caracteres");
+        }
+        User user = userRepository.findByResetToken(request.getToken().trim())
                 .orElseThrow(() -> new IllegalArgumentException("Token inválido o expirado"));
 
         if (user.getResetTokenExpiry() == null || user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {

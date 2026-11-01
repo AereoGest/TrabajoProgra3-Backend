@@ -44,6 +44,7 @@ public class User implements UserDetails {
     private Boolean perfilCompleto;
 
     @Column(nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
     private Boolean isVerified = false;
 
     @Column(unique = true)
@@ -55,9 +56,12 @@ public class User implements UserDetails {
     private LocalDateTime resetTokenExpiry;
 
     @Column(nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
     private Boolean twoFactorEnabled = false;
 
     private String twoFactorCode;
+
+    private LocalDateTime twoFactorCodeExpiry;
 
 
     @Enumerated(EnumType.STRING)

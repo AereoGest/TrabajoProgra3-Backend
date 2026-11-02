@@ -239,35 +239,6 @@ public class VueloService {
     }
 
     public List<Vuelo> buscarVuelosConFiltrosAvanzados(
-            String ciudadOrigen,
-            String ciudadDestino,
-            LocalDateTime fechaSalida,
-            LocalDateTime fechaLlegada,
-            Double precioMaximo,
-            Boolean escala,
-            estadoVuelo estado,
-            String paisDestino) {
-
-        validarCiudad(ciudadOrigen, "origen");
-        validarCiudad(ciudadDestino, "destino");
-        validarCiudad(paisDestino, "país destino");
-
-        Specification<Vuelo> spec = Specification
-                .where(VueloSpecification.noCancelados())
-                .and(VueloSpecification.porCiudadOrigen(ciudadOrigen))
-                .and(VueloSpecification.porCiudadDestino(ciudadDestino))
-                .and(VueloSpecification.porPaisDestino(paisDestino))
-                .and(VueloSpecification.porFechaSalidaDesde(fechaSalida))
-                .and(VueloSpecification.porFechaLlegadaHasta(fechaLlegada))
-                .and(VueloSpecification.precioMenorOIgualA(precioMaximo))
-                .and(VueloSpecification.porEscala(escala))
-                .and(VueloSpecification.porEstado(estado));
-
-        List<Vuelo> vuelos = vueloRepository.findAll(spec);
-        return filtrarConCapacidad(vuelos);
-    }
-
-    public List<Vuelo> buscarVuelosConFiltrosAvanzados(
             String origen,
             String destino,
             LocalDateTime fechaSalida,
@@ -276,20 +247,7 @@ public class VueloService {
             Boolean escala,
             estadoVuelo estado) {
 
-        validarCiudad(origen, "origen");
-        validarCiudad(destino, "destino");
-
-        Specification<Vuelo> spec = Specification
-                .where(VueloSpecification.noCancelados())
-                .and(VueloSpecification.porOrigenGeneral(origen))
-                .and(VueloSpecification.porDestinoGeneral(destino))
-                .and(VueloSpecification.porFechaSalidaDesde(fechaSalida))
-                .and(VueloSpecification.porFechaLlegadaHasta(fechaLlegada))
-                .and(VueloSpecification.precioMenorOIgualA(precioMaximo))
-                .and(VueloSpecification.porEscala(escala))
-                .and(VueloSpecification.porEstado(estado));
-
-        List<Vuelo> vuelos = vueloRepository.findAll(spec);
+        List<Vuelo> vuelos = buscarVuelos(origen, destino, fechaSalida, fechaLlegada, precioMaximo, escala, estado);
         return filtrarConCapacidad(vuelos);
     }
 
@@ -319,6 +277,18 @@ public class VueloService {
             Double precioMaximo,
             Boolean escala) {
 
+        return buscarVuelos(origen, destino, fechaSalida, fechaLlegada, precioMaximo, escala, null);
+    }
+
+    private List<Vuelo> buscarVuelos(
+            String origen,
+            String destino,
+            LocalDateTime fechaSalida,
+            LocalDateTime fechaLlegada,
+            Double precioMaximo,
+            Boolean escala,
+            estadoVuelo estado) {
+
         validarCiudad(origen, "origen");
         validarCiudad(destino, "destino");
 
@@ -329,7 +299,8 @@ public class VueloService {
                 .and(VueloSpecification.porFechaSalidaDesde(fechaSalida))
                 .and(VueloSpecification.porFechaLlegadaHasta(fechaLlegada))
                 .and(VueloSpecification.precioMenorOIgualA(precioMaximo))
-                .and(VueloSpecification.porEscala(escala));
+                .and(VueloSpecification.porEscala(escala))
+                .and(VueloSpecification.porEstado(estado));
 
         return vueloRepository.findAll(spec);
     }

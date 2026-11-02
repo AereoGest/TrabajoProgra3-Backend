@@ -8,37 +8,6 @@ import java.time.LocalDateTime;
 
 public class VueloSpecification {
 
-    public static Specification<Vuelo> porCiudadOrigen(String ciudadOrigen) {
-        return (root, query, criteriaBuilder) -> {
-            if (ciudadOrigen == null || ciudadOrigen.trim().isEmpty())
-                return null;
-            return criteriaBuilder.like(
-                    criteriaBuilder.lower(root.get("aeropuertoOrigen").get("ciudad")),
-                    "%" + ciudadOrigen.toLowerCase() + "%");
-        };
-    }
-
-    public static Specification<Vuelo> porCiudadDestino(String ciudadDestino) {
-        return (root, query, criteriaBuilder) -> {
-            if (ciudadDestino == null || ciudadDestino.trim().isEmpty())
-                return null;
-            return criteriaBuilder.like(
-                    criteriaBuilder.lower(root.get("aeropuertoDestino").get("ciudad")),
-                    "%" + ciudadDestino.toLowerCase() + "%");
-        };
-    }
-
-    public static Specification<Vuelo> porPaisDestino(String PaisDestino) {
-        return (root, query, criteriaBuilder) -> {
-            if (PaisDestino == null || PaisDestino.trim().isEmpty())
-                return null;
-            return criteriaBuilder.like(
-                    criteriaBuilder.lower(root.get("aeropuertoDestino").get("pais")),
-                    "%" + PaisDestino.toLowerCase() + "%");
-        };
-
-    }
-
     public static Specification<Vuelo> porFechaSalidaDesde(LocalDateTime fechaSalida) {
         return (root, query, criteriaBuilder) -> {
             if (fechaSalida == null)

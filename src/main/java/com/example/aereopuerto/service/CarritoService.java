@@ -16,7 +16,7 @@ import com.example.aereopuerto.repository.CarritoRepository;
 import com.example.aereopuerto.repository.PersonaRepository;
 import com.example.aereopuerto.repository.VueloRepository;
 import com.example.aereopuerto.auth.entity.User;
-import com.example.aereopuerto.auth.repository.UserRepository;
+import com.example.aereopuerto.auth.service.UsuarioAutenticadoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -28,7 +28,7 @@ public class CarritoService {
     private final CarritoItemRepository carritoItemRepository;
     private final PersonaRepository personaRepository;
     private final VueloRepository vueloRepository;
-    private final UserRepository userRepository;
+    private final UsuarioAutenticadoService usuarioAutenticadoService;
 
     public CarritoDTO getCarritoByPersonaId(Integer personaId) {
         Carrito carrito = createOrFindCarrito(personaId);
@@ -126,7 +126,9 @@ public class CarritoService {
     }
 
     public CarritoItemDTO addItemPorToken(String email, Integer vueloId, Integer cantidad, ClasesVuelo clase) {
-        return addItem(obtenerPersonaPorEmail(email).getId(), vueloId, cantidad, clase);
+        User user = usuarioAutenticadoService.getUsuarioPorEmail(email);
+        usuarioAutenticadoService.validarCuentaVerificada(user, "reservar vuelos");
+        return addItem(usuarioAutenticadoService.getPersona(user).getId(), vueloId, cantidad, clase);
     }
 
     public CarritoItemDTO updateItemQuantityPorToken(String email, Integer itemId, Integer cantidad) {
@@ -142,13 +144,7 @@ public class CarritoService {
     }
 
     private Persona obtenerPersonaPorEmail(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new PersonaInvalidaException("Usuario no encontrado para el token provisto."));
-        Persona persona = user.getPersona();
-        if (persona == null) {
-            throw new PersonaInvalidaException("El usuario no tiene una persona asociada.");
-        }
-        return persona;
+        return usuarioAutenticadoService.getPersonaPorEmail(email);
     }
 
     private CarritoDTO mapToDTO(Carrito carrito) {

@@ -60,14 +60,6 @@ public class ReservaController {
         return ResponseEntity.ok(reservaService.obtenerTodasLasReservas());
     }
 
-    @Operation(summary = "Crear reserva", description = "Registra una nueva reserva.")
-    @PostMapping
-    @PreAuthorize("hasAnyRole('EMPLEADO', 'ADMIN')")
-    public ResponseEntity<Reserva> crearReserva(@Valid @RequestBody ReservaRequest reserva) {
-        Reserva nueva = reservaService.crearReserva(reserva);
-        return ResponseEntity.status(HttpStatus.CREATED).body(nueva);
-    }
-
     @Operation(summary = "Crear mi reserva", description = "El cliente autenticado crea una reserva a su nombre.")
     @PostMapping("/mis-reservas")
     public ResponseEntity<Reserva> crearMiReserva(
@@ -92,16 +84,6 @@ public class ReservaController {
     @PreAuthorize("hasAnyRole('EMPLEADO', 'ADMIN')")
     public ResponseEntity<Reserva> actualizarReserva(@PathVariable Integer id, @RequestBody ReservaDTO reserva) {
         return ResponseEntity.ok(reservaService.actualizarReserva(id, reserva));
-    }
-
-    @Operation(summary = "Cancelar reserva", description = "Cancela una reserva existente.")
-    @PutMapping("/{id}/cancelar")
-    @PreAuthorize("hasAnyRole('EMPLEADO', 'ADMIN')")
-    public ResponseEntity<String> cancelarReserva(@PathVariable Integer id) {
-
-        reservaService.cancelarReserva(id);
-
-        return ResponseEntity.ok("Reserva cancelada correctamente");
     }
 
     @Operation(summary = "Cancelar reserva", description = "Cancela una reserva existente.")

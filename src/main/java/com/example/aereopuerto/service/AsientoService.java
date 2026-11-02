@@ -28,13 +28,6 @@ public class AsientoService {
                 .toList();
     }
 
-    public Asiento buscarPorId(Integer asientoId) {
-
-        return asientoRepository.findById(asientoId)
-                .orElseThrow(() ->
-                        new AsientoInvalidoException("Asiento no encontrado"));
-    }
-
     public Map<Integer, Boolean> verificarDisponibilidad(List<Integer> ids) {
         Map<Integer, Boolean> resultado = new HashMap<>();
         for (Integer id : ids) {

@@ -3,8 +3,7 @@ package com.example.aereopuerto.service;
 import com.example.aereopuerto.Exceptions.FavoritoInvalidoException;
 import com.example.aereopuerto.Exceptions.PersonaInvalidaException;
 import com.example.aereopuerto.Exceptions.VueloInvalidoException;
-import com.example.aereopuerto.auth.entity.User;
-import com.example.aereopuerto.auth.repository.UserRepository;
+import com.example.aereopuerto.auth.service.UsuarioAutenticadoService;
 import com.example.aereopuerto.dto.FavoritoDTO;
 import com.example.aereopuerto.model.Favorito;
 import com.example.aereopuerto.model.Persona;
@@ -25,17 +24,10 @@ public class FavoritoService {
     private final FavoritoRepository favoritoRepository;
     private final PersonaRepository personaRepository;
     private final VueloRepository vueloRepository;
-    private final UserRepository userRepository;
+    private final UsuarioAutenticadoService usuarioAutenticadoService;
 
 
-    public List<FavoritoDTO> getFavoritosByPersonaId(Integer personaId) {
-        return favoritoRepository.findByPersonaId(personaId)
-                .stream()
-                .map(this::mapToDTO)
-                .toList();
-    }
-
-    public FavoritoDTO addFavorito(Integer personaId, Integer vueloId) {
+    private FavoritoDTO addFavorito(Integer personaId, Integer vueloId) {
         if (favoritoRepository.findByPersonaIdAndVueloId(personaId, vueloId).isPresent()) {
             throw new FavoritoInvalidoException("El vuelo ya se encuentra en favoritos para este usuario.");
         }
@@ -55,7 +47,7 @@ public class FavoritoService {
         return mapToDTO(favoritoRepository.save(favorito));
     }
 
-    public void removeFavorito(Integer personaId, Integer favoritoId) {
+    private void removeFavorito(Integer personaId, Integer favoritoId) {
         Favorito favorito = favoritoRepository.findById(favoritoId)
                 .orElseThrow(() -> new FavoritoInvalidoException("Favorito no encontrado con id: " + favoritoId));
         if (!favorito.getPersona().getId().equals(personaId)) {
@@ -76,22 +68,7 @@ public class FavoritoService {
 
     //@CacheEvict(value = "favoritos", key = "#result.personaId")
     public FavoritoDTO addFavoritoPorToken(String email, Integer vueloId) {
-        Persona persona = obtenerPersonaPorEmail(email);
-
-        if (favoritoRepository.findByPersonaIdAndVueloId(persona.getId(), vueloId).isPresent()) {
-            throw new FavoritoInvalidoException("El vuelo ya se encuentra en favoritos.");
-        }
-
-        Vuelo vuelo = vueloRepository.findById(vueloId)
-                .orElseThrow(() -> new VueloInvalidoException("Vuelo no encontrado con id: " + vueloId));
-
-        Favorito favorito = Favorito.builder()
-                .persona(persona)
-                .vuelo(vuelo)
-                .fechaAgregado(LocalDateTime.now())
-                .build();
-
-        return mapToDTO(favoritoRepository.save(favorito));
+        return addFavorito(obtenerPersonaPorEmail(email).getId(), vueloId);
     }
 
     public List<FavoritoDTO> getFavoritosPorToken(String email) {
@@ -109,14 +86,7 @@ public class FavoritoService {
     }
 
     private Persona obtenerPersonaPorEmail(String email) {
-        User usuario = userRepository.findByEmail(email)
-                .orElseThrow(() -> new PersonaInvalidaException("Usuario no encontrado para el token provisto."));
-
-        Persona persona = usuario.getPersona();
-        if (persona == null) {
-            throw new PersonaInvalidaException("El usuario no tiene una persona asociada.");
-        }
-        return persona;
+        return usuarioAutenticadoService.getPersonaPorEmail(email);
     }
 
 }

@@ -7,6 +7,7 @@ import com.example.aereopuerto.Specifications.ReservaSpecification;
 import com.example.aereopuerto.auth.entity.Role;
 import com.example.aereopuerto.auth.entity.User;
 import com.example.aereopuerto.auth.repository.UserRepository;
+import com.example.aereopuerto.auth.service.UsuarioAutenticadoService;
 import com.example.aereopuerto.dto.*;
 import com.example.aereopuerto.model.*;
 import com.example.aereopuerto.model.enums.EstadoReserva;
@@ -50,6 +51,7 @@ public class ReservaService {
     private final FacturaRepository facturaRepository;
     private final CarritoRepository carritoRepository;
     private final CarritoService carritoService;
+    private final UsuarioAutenticadoService usuarioAutenticadoService;
 
     @Value("${tarifas.impuesto}")
     private BigDecimal tasaImpuesto;
@@ -96,11 +98,8 @@ public class ReservaService {
                 .orElseThrow(() -> new PersonaInvalidaException(
                         "Usuario no encontrado. ID: " + request.getPersonaId()));
 
-        userRepository.findByPersonaId(persona.getId()).ifPresent(u -> {
-            if (!Boolean.TRUE.equals(u.getIsVerified())) {
-                throw new ReservaInvalidaException("Debes verificar tu cuenta de correo electrónico antes de realizar una reserva.");
-            }
-        });
+        userRepository.findByPersonaId(persona.getId())
+                .ifPresent(u -> usuarioAutenticadoService.validarCuentaVerificada(u, "realizar una reserva"));
 
         Vuelo vuelo = vueloRepository.findById(request.getVueloId())
                 .orElseThrow(() -> new ReservaInvalidaException(
@@ -238,14 +237,14 @@ public class ReservaService {
                 Integer personaId = reserva.getPersona().getId();
                 carritoService.clearCarrito(personaId, carritoService.getCarritoByPersonaId(personaId).getId());
             }
-            case "rejected" -> cancelarPorPagoRechazado(reserva);
+            case "rejected" -> liberarAsientosYCancelar(reserva);
             default -> reservaRepository.save(reserva); // in_process / pending: queda PROCESANDO
         }
 
         return new PagoResponse(status, detalle, reserva.getCodigoReserva(), reserva.getEstadoReserva());
     }
 
-    private void cancelarPorPagoRechazado(Reserva reserva) {
+    private void liberarAsientosYCancelar(Reserva reserva) {
         for (Pasaje p : reserva.getPasajes()) {
             if (p.getAsiento() != null) {
                 p.getAsiento().setOcupado(false);
@@ -368,15 +367,7 @@ public class ReservaService {
             System.out.println("Reembolso parcial de $" + reembolso + " para la reserva ID: " + id);
         }
 
-        for (Pasaje p : reserva.getPasajes()) {
-            if (p.getAsiento() != null) {
-                p.getAsiento().setOcupado(false);
-                asientoRepository.save(p.getAsiento());
-            }
-        }
-        reserva.getPasajes().clear();
-        reserva.setEstadoReserva(EstadoReserva.CANCELADA);
-        reservaRepository.save(reserva);
+        liberarAsientosYCancelar(reserva);
     }
 
     @CacheEvict(value = "reservas", allEntries = true)
@@ -438,21 +429,11 @@ public class ReservaService {
 
         Integer personaId = null;
         if (email != null && !email.trim().isEmpty()) {
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new PersonaInvalidaException("Usuario no encontrado con email: " + email));
-            personaId = user.getPersona().getId();
+            personaId = usuarioAutenticadoService.getPersonaPorEmail(email).getId();
         }
 
-        Specification<Reserva> spec = Specification
-                .where(ReservaSpecification.porPersonaId(personaId))
-                .and(ReservaSpecification.porEstado(estado))
-                .and(ReservaSpecification.porFechaDesde(fechaDesde))
-                .and(ReservaSpecification.porFechaHasta(fechaHasta))
-                .and(ReservaSpecification.porValorMinimo(valorMinimo))
-                .and(ReservaSpecification.porValorMaximo(valorMaximo))
-                .and(ReservaSpecification.porCantidadPasajes(cantidadPasajes));
-
-        return reservaRepository.findAll(spec);
+        return buscarReservasConFiltros(personaId, estado, fechaDesde, fechaHasta,
+                valorMinimo, valorMaximo, cantidadPasajes);
     }
 
     public List<Reserva> buscarMisReservasConFiltros(
@@ -464,8 +445,21 @@ public class ReservaService {
             Double valorMaximo,
             Integer cantidadPasajes) {
 
+        return buscarReservasConFiltros(persona.getId(), estado, fechaDesde, fechaHasta,
+                valorMinimo, valorMaximo, cantidadPasajes);
+    }
+
+    private List<Reserva> buscarReservasConFiltros(
+            Integer personaId,
+            EstadoReserva estado,
+            LocalDateTime fechaDesde,
+            LocalDateTime fechaHasta,
+            Double valorMinimo,
+            Double valorMaximo,
+            Integer cantidadPasajes) {
+
         Specification<Reserva> spec = Specification
-                .where(ReservaSpecification.porPersonaId(persona.getId()))
+                .where(ReservaSpecification.porPersonaId(personaId))
                 .and(ReservaSpecification.porEstado(estado))
                 .and(ReservaSpecification.porFechaDesde(fechaDesde))
                 .and(ReservaSpecification.porFechaHasta(fechaHasta))

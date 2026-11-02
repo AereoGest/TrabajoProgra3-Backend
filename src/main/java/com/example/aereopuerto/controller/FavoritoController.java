@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,24 +20,6 @@ import java.util.List;
 public class FavoritoController {
 
     private final FavoritoService favoritoService;
-
-    @Operation(summary = "Obtener favoritos por ID de persona.", description = "Devuelve favoritos de una persona.")
-    @GetMapping("/{personaId}")
-    @PreAuthorize("hasAnyRole('EMPLEADO', 'ADMIN')")
-    public ResponseEntity<List<FavoritoDTO>> getFavoritos(@PathVariable Integer personaId) {
-        return ResponseEntity.ok(favoritoService.getFavoritosByPersonaId(personaId));
-    }
-
-    @Operation(
-            summary = "Agregar vuelo a favoritos",
-            description = "Agrega un vuelo a la lista de favoritos del usuario autenticado"
-    )
-    @ApiResponse(responseCode = "201", description = "Favorito agregado correctamente")
-    @PostMapping
-    @PreAuthorize("hasAnyRole('EMPLEADO', 'ADMIN')")
-    public ResponseEntity<FavoritoDTO> addFavorito(@RequestParam Integer personaId, @RequestParam Integer vueloId) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(favoritoService.addFavorito(personaId, vueloId));
-    }
 
     @Operation(summary = "Eliminar un favorito.", description = "Elimina un favorito de una persona.")
     @DeleteMapping("/{id}")

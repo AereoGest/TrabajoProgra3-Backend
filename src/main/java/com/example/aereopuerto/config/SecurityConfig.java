@@ -46,7 +46,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/vuelos/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/asientos/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/config/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/mercadopago/webhook").permitAll()
 
                         .requestMatchers("/api/auth/completarPerfil", "/api/auth/toggle-2fa").hasAnyAuthority("ROLE_INCOMPLETO", "ROLE_USUARIO", "ROLE_EMPLEADO", "ROLE_ADMIN")
 
@@ -95,7 +94,6 @@ public class SecurityConfig {
                                 "/api/favoritos/**",
                                 "/api/facturas/**",
                                 "/api/carrito/**",
-                                "/api/compras/**",
                                 "/api/asistenciasAlViajero/**",
                                 "/api/auth/perfil",
                                 "/api/equipajes"

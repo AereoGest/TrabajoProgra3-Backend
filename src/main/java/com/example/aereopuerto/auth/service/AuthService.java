@@ -52,17 +52,7 @@ public class AuthService {
             return response;
         }
 
-        String token = jwtService.generateToken(user, user.getId());
-        return AuthResponse.builder()
-                .token(token)
-                .email(user.getEmail())
-                .userId(user.getId())
-                .perfilCompleto(user.getPerfilCompleto())
-                .requires2fa(false)
-                .role(user.getRole() != null ? user.getRole().name() : null)
-                .isVerified(user.getIsVerified())
-
-                .build();
+        return buildAuthResponse(user, jwtService.generateToken(user, user.getId()));
     }
 
     public AuthResponse register(RegisterRequest request) {
@@ -97,28 +87,12 @@ public class AuthService {
 
         emailService.sendVerificationEmail(user.getEmail(), verificationToken);
 
-        return AuthResponse.builder()
-                .token(null)
-                .email(user.getEmail())
-                .userId(user.getId())
-                .perfilCompleto(user.getPerfilCompleto())
-                .requires2fa(false)
-                .role(user.getRole() != null ? user.getRole().name() : null)
-                .isVerified(user.getIsVerified())
-
-                .build();
+        return buildAuthResponse(user, null);
     }
 
     public PerfilResponse obtenerPerfil() {
 
-        String email = SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getName();
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("Usuario no encontrado"));
+        User user = obtenerUsuarioActual();
 
         Persona persona = user.getPersona();
 
@@ -134,9 +108,6 @@ public class AuthService {
                 .sexo(persona.getSexo())
                 .isVerified(user.getIsVerified())
                 .role(user.getRole().name())
-                .isVerified(user.getIsVerified())
-
-
                 .build();
     }
 
@@ -176,65 +147,16 @@ public class AuthService {
 
 
     public ResponseEntity<AuthResponse> completarPerfil(CompletarPerfilRequest request) {
-
-        String email = SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getName();
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("Usuario no encontrado"));
-
-        validarPerfilRequest(request);
-
-        Persona persona = user.getPersona();
-
-        personaRepository.findByNumeroIdentificador(request.getNumeroIdentificador())
-                .ifPresent(existing -> {
-                    if (!existing.getId().equals(persona.getId())) {
-                        throw new IllegalArgumentException("El n\u00famero de documento ya est\u00e1 registrado por otro usuario.");
-                    }
-                });
-
-        persona.setNombre(request.getNombre());
-        persona.setApellido(request.getApellido());
-        persona.setNumeroIdentificador(request.getNumeroIdentificador());
-        persona.setIdentificador(request.getIdentificador());
-        persona.setSexo(request.getSexo());
-        persona.setFechaNacimiento(request.getFechaNacimiento());
-        user.setTelefono(request.getTelefono());
-
-        user.setPerfilCompleto(true);
-        user.setRole(Role.ROLE_USUARIO);
-
-        personaRepository.save(persona);
-        userRepository.save(user);
-
-        String nuevoToken = jwtService.generateToken(user, user.getId());
-        return ResponseEntity.ok(AuthResponse.builder()
-                .token(nuevoToken)
-                .email(user.getEmail())
-                .userId(user.getId())
-                .perfilCompleto(true)
-                .requires2fa(false)
-                .role(user.getRole() != null ? user.getRole().name() : null)
-                .isVerified(user.getIsVerified())
-
-                .build());
-
+        return guardarPerfil(request);
     }
 
     public ResponseEntity<AuthResponse> actualizarPerfil(CompletarPerfilRequest request) {
+        return guardarPerfil(request);
+    }
 
-        String email = SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getName();
+    private ResponseEntity<AuthResponse> guardarPerfil(CompletarPerfilRequest request) {
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("Usuario no encontrado"));
+        User user = obtenerUsuarioActual();
 
         validarPerfilRequest(request);
 
@@ -263,18 +185,7 @@ public class AuthService {
         personaRepository.save(persona);
         userRepository.save(user);
 
-        String nuevoToken = jwtService.generateToken(user, user.getId());
-        return ResponseEntity.ok(AuthResponse.builder()
-                .token(nuevoToken)
-                .email(user.getEmail())
-                .userId(user.getId())
-                .perfilCompleto(true)
-                .requires2fa(false)
-                .role(user.getRole() != null ? user.getRole().name() : null)
-                .isVerified(user.getIsVerified())
-
-
-                .build());
+        return ResponseEntity.ok(buildAuthResponse(user, jwtService.generateToken(user, user.getId())));
     }
 
     private void validarPerfilRequest(CompletarPerfilRequest request) {
@@ -303,17 +214,7 @@ public class AuthService {
         user.setVerificationToken(null);
         userRepository.save(user);
 
-        String jwtToken = jwtService.generateToken(user, user.getId());
-        return AuthResponse.builder()
-                .token(jwtToken)
-                .email(user.getEmail())
-                .userId(user.getId())
-                .perfilCompleto(user.getPerfilCompleto())
-                .requires2fa(false)
-                .role(user.getRole() != null ? user.getRole().name() : null)
-                .isVerified(user.getIsVerified())
-
-                .build();
+        return buildAuthResponse(user, jwtService.generateToken(user, user.getId()));
     }
 
     public AuthResponse verify2fa(Verify2FARequest request) {
@@ -331,17 +232,7 @@ public class AuthService {
         user.setTwoFactorCodeExpiry(null);
         userRepository.save(user);
 
-        String token = jwtService.generateToken(user, user.getId());
-        return AuthResponse.builder()
-                .token(token)
-                .email(user.getEmail())
-                .userId(user.getId())
-                .perfilCompleto(user.getPerfilCompleto())
-                .requires2fa(false)
-                .role(user.getRole() != null ? user.getRole().name() : null)
-                .isVerified(user.getIsVerified())
-
-                .build();
+        return buildAuthResponse(user, jwtService.generateToken(user, user.getId()));
     }
 
     public void resendVerificationEmail(String email) {
@@ -400,13 +291,7 @@ public class AuthService {
     }
 
     public ResponseEntity<String> toggle2fa() {
-        String email = SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getName();
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+        User user = obtenerUsuarioActual();
 
         boolean currentStatus = Boolean.TRUE.equals(user.getTwoFactorEnabled());
         user.setTwoFactorEnabled(!currentStatus);
@@ -414,5 +299,23 @@ public class AuthService {
 
         String status = !currentStatus ? "habilitado" : "deshabilitado";
         return ResponseEntity.ok("2FA " + status + " exitosamente.");
+    }
+
+    private User obtenerUsuarioActual() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+    }
+
+    private AuthResponse buildAuthResponse(User user, String token) {
+        return AuthResponse.builder()
+                .token(token)
+                .email(user.getEmail())
+                .userId(user.getId())
+                .perfilCompleto(user.getPerfilCompleto())
+                .requires2fa(false)
+                .role(user.getRole() != null ? user.getRole().name() : null)
+                .isVerified(user.getIsVerified())
+                .build();
     }
 }

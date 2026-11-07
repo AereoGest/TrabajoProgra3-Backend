@@ -1,9 +1,11 @@
 package com.example.aereopuerto.controller;
 
 import com.example.aereopuerto.auth.entity.User;
+import com.example.aereopuerto.dto.CheckinMostradorRequest;
 import com.example.aereopuerto.dto.Checkinresponsedto;
 import com.example.aereopuerto.dto.PagoRequest;
 import com.example.aereopuerto.dto.PagoResponse;
+import com.example.aereopuerto.dto.ReservaCheckinDTO;
 import com.example.aereopuerto.dto.ReservaDTO;
 import com.example.aereopuerto.dto.ReservaRequest;
 import com.example.aereopuerto.model.Reserva;
@@ -94,8 +96,7 @@ public class ReservaController {
         return ResponseEntity.ok("Reserva cancelada correctamente");
     }
 
-    // La idea sería que usuario solo pueda filtrar dentro de SUS reservas
-    @Operation(summary = "Filtrar reservas", description = "Permite filtrar reservas por email, estado, fechas, valor y cantidad de pasajes. Todos los filtros son opcionales.")
+    @Operation(summary = "Filtrar mis reservas", description = "Permite al usuario filtrar sus reservas por estado, fechas, valor y cantidad de pasajes. Todos los filtros son opcionales.")
     @ApiResponse(responseCode = "200", description = "Resultados obtenidos correctamente")
     @GetMapping("/mis-reservas/filtrar")
     public ResponseEntity<List<Reserva>> filtrarMisReservas(
@@ -135,14 +136,6 @@ public class ReservaController {
         return ResponseEntity.ok(reservaService.actualizarReserva(id, reserva));
     }
 
-    @Operation(summary = "Hacer check-in (empleado)", description = "Marca una reserva como check-in realizado.")
-    @PatchMapping("/{id}/checkin")
-    @PreAuthorize("hasAnyRole('EMPLEADO', 'ADMIN')")
-    public ResponseEntity<String> hacerCheckin(@PathVariable Integer id) {
-        reservaService.hacerCheckin(id);
-        return ResponseEntity.ok("Check-in realizado correctamente");
-    }
-
     @Operation(summary = "Eliminar reserva", description = "Elimina una reserva.")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('EMPLEADO', 'ADMIN')")
@@ -151,7 +144,7 @@ public class ReservaController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Filtrar reservas de su totalidad", description = "Aplica los filtros deseados a la totalidad de las reservas .")
+    @Operation(summary = "Filtrar todas las reservas", description = "Aplica los filtros deseados a la totalidad de las reservas.")
     @GetMapping("/filtrar")
     @PreAuthorize("hasAnyRole('EMPLEADO', 'ADMIN')")
     public ResponseEntity<List<Reserva>> filtrarReservas(
@@ -165,5 +158,42 @@ public class ReservaController {
 
         return ResponseEntity.ok(reservaService.buscarTodasReservasConFiltros(
                 email, estado, fechaDesde, fechaHasta, valorMinimo, valorMaximo, cantidadPasajes));
+    }
+
+    // ===================== Check-in en mostrador (Empleado / Admin) =====================
+
+    @Operation(summary = "Buscar reserva para check-in (mostrador)",
+            description = "El empleado o admin busca la reserva con el código de reserva y el documento que le da el pasajero. No modifica nada.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Reserva encontrada"),
+            @ApiResponse(responseCode = "400", description = "Falta el código o el documento"),
+            @ApiResponse(responseCode = "403", description = "El usuario no es empleado ni admin"),
+            @ApiResponse(responseCode = "404", description = "No hay una reserva con ese código y documento")
+    })
+    @PostMapping("/check-in/buscar")
+    @PreAuthorize("hasAnyRole('EMPLEADO', 'ADMIN')")
+    public ResponseEntity<ReservaCheckinDTO> buscarReservaParaCheckIn(
+            @Valid @RequestBody CheckinMostradorRequest request) {
+        return ResponseEntity.ok(
+                checkinService.buscarParaMostrador(request.getCodigoReserva(), request.getDocumento()));
+    }
+
+    @Operation(summary = "Hacer check-in de otra persona (mostrador)",
+            description = "El empleado o admin hace el check-in de una reserva confirmada. Exige el código de reserva y el documento del pasajero o del titular.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Check-in realizado (o ya estaba hecho)"),
+            @ApiResponse(responseCode = "400", description = "Falta el código o el documento"),
+            @ApiResponse(responseCode = "403", description = "El usuario no es empleado ni admin"),
+            @ApiResponse(responseCode = "404", description = "No hay una reserva con ese código y documento"),
+            @ApiResponse(responseCode = "409", description = "Reserva no confirmada, vuelo ya salido o sin asientos libres")
+    })
+    @PostMapping("/check-in/mostrador")
+    @PreAuthorize("hasAnyRole('EMPLEADO', 'ADMIN')")
+    public ResponseEntity<Checkinresponsedto> hacerCheckInMostrador(
+            @Valid @RequestBody CheckinMostradorRequest request) {
+        return ResponseEntity.ok(
+                checkinService.hacerCheckInMostrador(request.getCodigoReserva(), request.getDocumento()));
     }
 }

@@ -49,6 +49,9 @@ public class Reserva implements Serializable {
     @Column(nullable = false, name="fecha_reserva")
     private LocalDateTime fechaReserva;
 
+    @Column(name = "fecha_check_in")
+    private LocalDateTime fechaCheckIn;
+
     @OneToMany(mappedBy = "reserva", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     @ToString.Exclude

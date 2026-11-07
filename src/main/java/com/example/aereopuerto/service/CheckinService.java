@@ -2,8 +2,11 @@ package com.example.aereopuerto.service;
 
 import com.example.aereopuerto.dto.Checkinresponsedto;
 import com.example.aereopuerto.dto.Pasajecheckindto;
+import com.example.aereopuerto.dto.ReservaCheckinDTO;
+import com.example.aereopuerto.model.Aeropuerto;
 import com.example.aereopuerto.model.Asiento;
 import com.example.aereopuerto.model.Pasaje;
+import com.example.aereopuerto.model.Persona;
 import com.example.aereopuerto.model.Reserva;
 import com.example.aereopuerto.model.Vuelo;
 import com.example.aereopuerto.model.enums.EstadoReserva;
@@ -40,11 +43,10 @@ public class CheckinService {
     private final AsientoRepository asientoRepository;
     private final VueloRepository vueloRepository;
 
+    // ===================== Cliente =====================
+
     /**
-     * Hace el check-in de todos los pasajes de la reserva.
-     * - Si el pasaje ya tiene asiento, se respeta.
-     * - Si no tiene, se le asigna uno libre al azar en ESE vuelo.
-     * Es idempotente: si ya se hizo, devuelve el resultado sin cambiar nada.
+     * El cliente hace el check-in de una reserva propia.
      */
     @Transactional
     // Limpia la caché de reservas: si no, GET /mis-reservas sigue devolviendo la versión sin check-in
@@ -56,6 +58,62 @@ public class CheckinService {
         if (!reserva.getPersona().getId().equals(personaId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "La reserva no pertenece al usuario");
         }
+        return realizarCheckIn(reserva);
+    }
+
+    // ===================== Mostrador (Empleado / Admin) =====================
+
+    /**
+     * El empleado o admin busca la reserva con el código y el documento que le da
+     * el pasajero, para ver los datos antes de confirmar. No modifica nada.
+     */
+    @Transactional(readOnly = true)
+    public ReservaCheckinDTO buscarParaMostrador(String codigoReserva, String documento) {
+        Reserva reserva = buscarPorCodigoYDocumento(codigoReserva, documento);
+
+        List<ReservaCheckinDTO.PasajeroCheckin> pasajes = reserva.getPasajes().stream()
+                .map(p -> new ReservaCheckinDTO.PasajeroCheckin(
+                        p.getId(),
+                        p.getNombre() + " " + p.getApellido(),
+                        p.getDocumento(),
+                        p.getVuelo().getId(),
+                        nombreAeropuerto(p.getVuelo().getAeropuertoOrigen()),
+                        nombreAeropuerto(p.getVuelo().getAeropuertoDestino()),
+                        p.getVuelo().getFechaSalida(),
+                        p.getVuelo().getHoraSalida(),
+                        p.getAsiento() != null ? p.getAsiento().getCodigo() : null))
+                .toList();
+
+        Persona titular = reserva.getPersona();
+        return new ReservaCheckinDTO(
+                reserva.getId(),
+                reserva.getCodigoReserva(),
+                reserva.getEstadoReserva(),
+                reserva.getFechaCheckIn(),
+                titular.getNombre() + " " + titular.getApellido(),
+                pasajes);
+    }
+
+    /**
+     * El empleado o admin hace el check-in solo si el código y el documento coinciden.
+     * El documento puede ser el de cualquier pasajero de la reserva o el del titular.
+     */
+    @Transactional
+    @CacheEvict(value = "reservas", allEntries = true)
+    public Checkinresponsedto hacerCheckInMostrador(String codigoReserva, String documento) {
+        Reserva reserva = buscarPorCodigoYDocumento(codigoReserva, documento);
+        return realizarCheckIn(reserva);
+    }
+
+    // ===================== Lógica común =====================
+
+    /**
+     * Hace el check-in de todos los pasajes de la reserva.
+     * - Si el pasaje ya tiene asiento, se respeta.
+     * - Si no tiene, se le asigna uno libre al azar en ESE vuelo.
+     * Es idempotente: si ya se hizo, devuelve el resultado sin cambiar nada.
+     */
+    private Checkinresponsedto realizarCheckIn(Reserva reserva) {
         if (reserva.getEstadoReserva() != EstadoReserva.CONFIRMADO) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Solo se puede hacer check-in de reservas confirmadas (pagas)");
         }
@@ -101,10 +159,6 @@ public class CheckinService {
 
                 Asiento elegido = libres.get(ThreadLocalRandom.current().nextInt(libres.size()));
                 pasaje.setAsiento(elegido);
-                // Mientras el mapa de asientos y crearReserva sigan usando el flag global "ocupado",
-                // lo marcamos para que nadie más pueda elegir este asiento
-                elegido.setOcupado(true);
-                asientoRepository.save(elegido);
                 ocupados.add(elegido.getId());
                 asignadosAhora.add(pasaje.getId());
             }
@@ -125,6 +179,40 @@ public class CheckinService {
                 .toList();
 
         return new Checkinresponsedto(reserva.getId(), reserva.getFechaCheckIn(), pasajes);
+    }
+
+    // ===================== Auxiliares =====================
+
+    private Reserva buscarPorCodigoYDocumento(String codigoReserva, String documento) {
+        String docBuscado = normalizarDocumento(documento);
+
+        // Mismo mensaje si el código no existe o si el documento no coincide:
+        // así no se puede averiguar qué códigos de reserva existen probando.
+        ResponseStatusException noEncontrada = new ResponseStatusException(HttpStatus.NOT_FOUND,
+                "No se encontró una reserva con ese código y documento");
+
+        Reserva reserva = reservaRepository.findByCodigoReservaIgnoreCase(codigoReserva.trim())
+                .orElseThrow(() -> noEncontrada);
+
+        boolean esPasajero = reserva.getPasajes() != null && reserva.getPasajes().stream()
+                .anyMatch(p -> docBuscado.equals(normalizarDocumento(p.getDocumento())));
+        boolean esTitular = docBuscado.equals(normalizarDocumento(reserva.getPersona().getNumeroIdentificador()));
+
+        if (docBuscado.isEmpty() || (!esPasajero && !esTitular)) {
+            throw noEncontrada;
+        }
+        return reserva;
+    }
+
+    /** Ignora puntos, espacios, guiones y mayúsculas: "12.345.678" == "12345678". */
+    private String normalizarDocumento(String documento) {
+        if (documento == null) return "";
+        return documento.replaceAll("[.\\s-]", "").toUpperCase();
+    }
+
+    private String nombreAeropuerto(Aeropuerto aeropuerto) {
+        if (aeropuerto == null) return null;
+        return aeropuerto.getCiudad() + " (" + aeropuerto.getCodigoIata() + ")";
     }
 
     private boolean esEconomico(Asiento asiento) {

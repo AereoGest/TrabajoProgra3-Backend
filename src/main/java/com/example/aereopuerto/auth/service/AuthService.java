@@ -106,6 +106,7 @@ public class AuthService {
                 .identificador(persona.getIdentificador())
                 .fechaNacimiento(persona.getFechaNacimiento())
                 .sexo(persona.getSexo())
+                .twoFactorEnabled(user.getTwoFactorEnabled())
                 .isVerified(user.getIsVerified())
                 .role(user.getRole().name())
                 .build();

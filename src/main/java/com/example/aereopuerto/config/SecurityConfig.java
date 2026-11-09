@@ -43,14 +43,20 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register", "/api/auth/verify-2fa", "/api/auth/logout", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/resend-verification").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/verify").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/vuelos/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/vuelos/disponibles", "/api/vuelos/disponibles/filtrar", "/api/vuelos/{id}").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/asientos/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/config/**").permitAll()
 
                         .requestMatchers("/api/auth/completarPerfil", "/api/auth/toggle-2fa").hasAnyAuthority("ROLE_INCOMPLETO", "ROLE_USUARIO", "ROLE_EMPLEADO", "ROLE_ADMIN")
 
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
                         .requestMatchers(
-                                HttpMethod.GET, "/api/reservas",
+                                HttpMethod.GET, "/api/vuelos",
+                                                "/api/vuelos/filtrar",
+                                                "/api/auth/usuarios",
+                                                "/api/auth/usuarios/{id}",
+                                                "/api/reservas",
                                                 "/api/reservas/filtrar",
                                                 "/api/pasajes",
                                                 "/api/pasajes/{id}",

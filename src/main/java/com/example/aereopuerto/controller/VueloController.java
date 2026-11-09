@@ -56,6 +56,7 @@ public class VueloController {
                 return ResponseEntity.ok(vueloService.obtenerVuelosCliente());
         }
 
+        @PreAuthorize("hasRole('ADMIN')")
         @Operation(summary = "Crear un nuevo vuelo", description = "Crea un vuelo en MySQL y actualiza automáticamente la caché de Redis.")
         @ApiResponse(responseCode = "201", description = "Vuelo creado exitosamente")
         @PostMapping
@@ -65,6 +66,7 @@ public class VueloController {
                 return ResponseEntity.status(HttpStatus.CREATED).body(nuevoVuelo);
         }
 
+        @PreAuthorize("hasRole('ADMIN')")
         @Operation(summary = "Actualizar un vuelo", description = "Actualiza los datos de un vuelo en MySQL y refresca la cache de Redis para no perder sincronia.")
         @ApiResponses(value = {
                         @ApiResponse(responseCode = "200", description = "Vuelo actualizado exitosamente"),
@@ -76,6 +78,7 @@ public class VueloController {
                 return ResponseEntity.ok(actualizado);
         }
 
+        @PreAuthorize("hasRole('ADMIN')")
         @Operation(summary = "Eliminar un vuelo", description = "Borra el vuelo de la base de datos e invalida su entrada en la cache Redis.")
         @ApiResponse(responseCode = "204", description = "Vuelo eliminado exitosamente")
         @DeleteMapping("/{id}")
@@ -113,6 +116,7 @@ public class VueloController {
                                                 escala));
         }
 
+        @PreAuthorize("hasRole('ADMIN')")
         @Operation(summary = "Filtrar vuelos", description = "Filtra el listado de vuelos según los criterios indicados. Todos los parámetros son opcionales y se combinan entre sí.")
         @ApiResponses(value = {
                         @ApiResponse(responseCode = "200", description = "Vuelos encontrados exitosamente"),

@@ -247,4 +247,27 @@ class AuthServiceTest {
         assertNull(testUser.getResetTokenExpiry());
         verify(userRepository).save(testUser);
     }
+
+    @Test
+    @DisplayName("Obtener perfil devuelve el rol real del usuario autenticado desde el servidor")
+    void obtenerPerfil_UsuarioAutenticado_DevuelveRolConfiable() {
+        testUser.setRole(Role.ROLE_ADMIN);
+        testUser.setTwoFactorEnabled(true);
+
+        var auth = new UsernamePasswordAuthenticationToken(
+                testUser.getEmail(), null, testUser.getAuthorities());
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+
+        when(userRepository.findByEmail("test@aerogest.com")).thenReturn(Optional.of(testUser));
+
+        var perfil = authService.obtenerPerfil();
+
+        assertNotNull(perfil);
+        assertEquals("test@aerogest.com", perfil.getEmail());
+        assertEquals("ROLE_ADMIN", perfil.getRole());
+        assertTrue(perfil.getIsVerified());
+        assertTrue(perfil.getTwoFactorEnabled());
+
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
 }

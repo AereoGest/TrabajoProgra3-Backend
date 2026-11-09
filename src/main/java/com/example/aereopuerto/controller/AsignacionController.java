@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
 
@@ -25,6 +26,17 @@ public class AsignacionController {
 
     @Autowired
     private AsignacionService asignacionService;
+
+    @Operation(
+            summary = "Obtener mis asignaciones",
+            description = "Devuelve las asignaciones del empleado autenticado, ordenadas por fecha de salida"
+    )
+    @ApiResponse(responseCode = "200", description = "Lista obtenida correctamente")
+    @GetMapping("/mias")
+    public ResponseEntity<List<Asignacion>> obtenerMisAsignaciones(Authentication authentication) {
+        return ResponseEntity.ok(asignacionService.obtenerMisAsignaciones(authentication.getName()));
+    }
+
 
     @Operation(
             summary = "Obtener asignación por ID",

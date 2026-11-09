@@ -3,6 +3,8 @@ package com.example.aereopuerto.controller;
 import com.example.aereopuerto.dto.AsignacionDTO;
 import com.example.aereopuerto.model.Asignacion;
 import com.example.aereopuerto.model.Persona;
+import com.example.aereopuerto.model.enums.RolEmpleado;
+import com.example.aereopuerto.model.enums.estadoVuelo;
 import com.example.aereopuerto.service.AsignacionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -10,12 +12,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -60,6 +64,26 @@ public class AsignacionController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Asignacion>> obtenerTodos() {
         return ResponseEntity.ok(asignacionService.obtenerTodosLasAsignaciones());
+    }
+
+    @Operation(
+            summary = "Filtrar asignaciones",
+            description = "Filtra el listado de asignaciones según múltiples criterios combinables: empleado, vuelo, rol, estado de vuelo, rango de fechas y texto libre."
+    )
+    @ApiResponse(responseCode = "200", description = "Resultados obtenidos correctamente")
+    @GetMapping("/filtrar")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<Asignacion>> filtrarAsignaciones(
+            @RequestParam(required = false) Integer empleadoId,
+            @RequestParam(required = false) Integer vueloId,
+            @RequestParam(required = false) RolEmpleado rolEmpleado,
+            @RequestParam(required = false) estadoVuelo estadoVuelo,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
+            @RequestParam(required = false) String busqueda) {
+        return ResponseEntity.ok(asignacionService.buscarAsignacionesConFiltros(
+                empleadoId, vueloId, rolEmpleado, estadoVuelo, fechaDesde, fechaHasta, busqueda
+        ));
     }
 
     @Operation(

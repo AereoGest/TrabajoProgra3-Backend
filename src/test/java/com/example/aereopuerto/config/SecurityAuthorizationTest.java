@@ -332,4 +332,24 @@ class SecurityAuthorizationTest {
         mockMvc.perform(get("/api/asignacion/mias"))
                 .andExpect(status().isOk());
     }
+    @Test
+    @WithMockUser(roles = "USUARIO")
+    @DisplayName("GET /api/asignacion/filtrar con rol USUARIO devuelve 403 Forbidden")
+    void filtrarAsignaciones_ConRolUsuario_Retorna403() throws Exception {
+        mockMvc.perform(get("/api/asignacion/filtrar"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("GET /api/asignacion/filtrar con rol ADMIN devuelve 200 OK")
+    void filtrarAsignaciones_ConRolAdmin_Retorna200() throws Exception {
+        when(asignacionService.buscarAsignacionesConFiltros(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/asignacion/filtrar")
+                        .param("busqueda", "Carlos")
+                        .param("rolEmpleado", "PILOTO"))
+                .andExpect(status().isOk());
+    }
 }

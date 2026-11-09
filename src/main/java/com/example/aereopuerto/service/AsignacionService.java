@@ -24,6 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import com.example.aereopuerto.Specifications.AsignacionSpecification;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import java.time.LocalDate;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -181,6 +186,31 @@ public class AsignacionService {
     /**
      * Devuelve la lista de personas que tienen rol de empleado o administrador para asignarlas en vuelos.
      */
+    /**
+     * Filtra asignaciones según múltiples criterios combinables.
+     */
+    public List<Asignacion> buscarAsignacionesConFiltros(
+            Integer empleadoId,
+            Integer vueloId,
+            RolEmpleado rolEmpleado,
+            estadoVuelo estadoVuelo,
+            LocalDate fechaDesde,
+            LocalDate fechaHasta,
+            String busqueda) {
+
+        Specification<Asignacion> spec = Specification
+                .where(AsignacionSpecification.porEmpleadoId(empleadoId))
+                .and(AsignacionSpecification.porVueloId(vueloId))
+                .and(AsignacionSpecification.porRolEmpleado(rolEmpleado))
+                .and(AsignacionSpecification.porEstadoVuelo(estadoVuelo))
+                .and(AsignacionSpecification.porFechaSalidaDesde(fechaDesde))
+                .and(AsignacionSpecification.porFechaSalidaHasta(fechaHasta))
+                .and(AsignacionSpecification.porTexto(busqueda));
+
+        Sort sort = Sort.by(Sort.Direction.ASC, "vuelo.fechaSalida", "vuelo.horaSalida");
+        return asignacionRepository.findAll(spec, sort);
+    }
+
     public List<Persona> obtenerEmpleadosDisponibles() {
         List<User> usuarios = userRepository.findByRoleIn(List.of(Role.ROLE_EMPLEADO, Role.ROLE_ADMIN));
         if (usuarios != null && !usuarios.isEmpty()) {

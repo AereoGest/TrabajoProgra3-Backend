@@ -20,6 +20,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -276,5 +278,21 @@ class AsignacionServiceTest {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> asignacionService.eliminarAsignacion(999));
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+    @Test
+    @DisplayName("buscarAsignacionesConFiltros: ejecuta consulta con Specification y ordenamiento")
+    void buscarAsignacionesConFiltros_Exitoso() {
+        Asignacion a = Asignacion.builder().id(1).rolEmpleado(RolEmpleado.PILOTO).build();
+        when(asignacionRepository.findAll(any(Specification.class), any(Sort.class)))
+                .thenReturn(List.of(a));
+
+        List<Asignacion> resultado = asignacionService.buscarAsignacionesConFiltros(
+                5, 10, RolEmpleado.PILOTO, estadoVuelo.PROGRAMADO,
+                LocalDate.now(), LocalDate.now().plusDays(2), "Juan"
+        );
+
+        assertNotNull(resultado);
+        assertEquals(1, resultado.size());
+        verify(asignacionRepository).findAll(any(Specification.class), any(Sort.class));
     }
 }

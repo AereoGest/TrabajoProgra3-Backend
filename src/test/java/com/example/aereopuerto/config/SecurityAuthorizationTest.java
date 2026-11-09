@@ -8,8 +8,13 @@ import com.example.aereopuerto.auth.entity.Role;
 import com.example.aereopuerto.auth.service.AuthService;
 import com.example.aereopuerto.auth.service.JwtService;
 import com.example.aereopuerto.auth.service.UserService;
+import com.example.aereopuerto.controller.AsignacionController;
 import com.example.aereopuerto.controller.PasajeController;
 import com.example.aereopuerto.controller.ReservaController;
+import com.example.aereopuerto.dto.AsignacionDTO;
+import com.example.aereopuerto.model.Asignacion;
+import com.example.aereopuerto.model.enums.RolEmpleado;
+import com.example.aereopuerto.service.AsignacionService;
 import com.example.aereopuerto.controller.VueloController;
 import com.example.aereopuerto.service.CheckinService;
 import com.example.aereopuerto.service.PasajeService;
@@ -29,6 +34,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -39,7 +45,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = {VueloController.class, AuthController.class, UserController.class, ReservaController.class, PasajeController.class})
+@WebMvcTest(controllers = {VueloController.class, AuthController.class, UserController.class, ReservaController.class, PasajeController.class, AsignacionController.class})
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class})
 class SecurityAuthorizationTest {
 
@@ -63,6 +69,9 @@ class SecurityAuthorizationTest {
 
     @MockitoBean
     private CheckinService checkinService;
+
+    @MockitoBean
+    private AsignacionService asignacionService;
 
     @MockitoBean
     private JwtService jwtService;
@@ -245,5 +254,82 @@ class SecurityAuthorizationTest {
                 .andExpect(status().isNoContent());
 
         verify(pasajeService).cancelarPasajeDeReserva(10, 50);
+    }
+    @Test
+    @WithMockUser(roles = "USUARIO")
+    @DisplayName("GET /api/asignacion con rol USUARIO devuelve 403 Forbidden")
+    void obtenerAsignaciones_ConRolUsuario_Retorna403() throws Exception {
+        mockMvc.perform(get("/api/asignacion"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "EMPLEADO")
+    @DisplayName("GET /api/asignacion con rol EMPLEADO devuelve 403 Forbidden")
+    void obtenerAsignaciones_ConRolEmpleado_Retorna403() throws Exception {
+        mockMvc.perform(get("/api/asignacion"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("GET /api/asignacion con rol ADMIN devuelve 200 OK")
+    void obtenerAsignaciones_ConRolAdmin_Retorna200() throws Exception {
+        when(asignacionService.obtenerTodosLasAsignaciones()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/asignacion"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "USUARIO")
+    @DisplayName("POST /api/asignacion con rol USUARIO devuelve 403 Forbidden")
+    void crearAsignacion_ConRolUsuario_Retorna403() throws Exception {
+        mockMvc.perform(post("/api/asignacion")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"vueloId\":1,\"empleadoId\":2,\"rolEmpleado\":\"PILOTO\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("POST /api/asignacion con rol ADMIN crea la asignación y devuelve 201 Created")
+    void crearAsignacion_ConRolAdmin_Retorna201() throws Exception {
+        when(asignacionService.crearAsignacion(any(AsignacionDTO.class)))
+                .thenReturn(Asignacion.builder().id(1).rolEmpleado(RolEmpleado.PILOTO).build());
+
+        mockMvc.perform(post("/api/asignacion")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"vueloId\":1,\"empleadoId\":2,\"rolEmpleado\":\"PILOTO\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "USUARIO")
+    @DisplayName("DELETE /api/asignacion/1 con rol USUARIO devuelve 403 Forbidden")
+    void eliminarAsignacion_ConRolUsuario_Retorna403() throws Exception {
+        mockMvc.perform(delete("/api/asignacion/1"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("DELETE /api/asignacion/1 con rol ADMIN elimina la asignación y devuelve 204 No Content")
+    void eliminarAsignacion_ConRolAdmin_Retorna204() throws Exception {
+        mockMvc.perform(delete("/api/asignacion/1"))
+                .andExpect(status().isNoContent());
+
+        verify(asignacionService).eliminarAsignacion(1);
+    }
+
+    @Test
+    @WithMockUser(username = "emp@aerogest.com", roles = "EMPLEADO")
+    @DisplayName("GET /api/asignacion/mias con rol EMPLEADO devuelve 200 OK")
+    void obtenerMisAsignaciones_ConRolEmpleado_Retorna200() throws Exception {
+        when(asignacionService.obtenerMisAsignaciones("emp@aerogest.com")).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/asignacion/mias"))
+                .andExpect(status().isOk());
     }
 }

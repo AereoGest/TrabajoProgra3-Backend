@@ -1,20 +1,20 @@
 package com.example.aereopuerto.controller;
 
-
-import com.example.aereopuerto.model.Aeropuerto;
+import com.example.aereopuerto.dto.AsignacionDTO;
 import com.example.aereopuerto.model.Asignacion;
+import com.example.aereopuerto.model.Persona;
 import com.example.aereopuerto.service.AsignacionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.apache.el.parser.AstGreaterThan;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -24,8 +24,7 @@ import java.util.List;
 @Tag(name = "Asignaciones", description = "Roles de los empleados segun los vuelos")
 public class AsignacionController {
 
-    @Autowired
-    private AsignacionService asignacionService;
+    private final AsignacionService asignacionService;
 
     @Operation(
             summary = "Obtener mis asignaciones",
@@ -33,10 +32,10 @@ public class AsignacionController {
     )
     @ApiResponse(responseCode = "200", description = "Lista obtenida correctamente")
     @GetMapping("/mias")
+    @PreAuthorize("hasAnyRole('EMPLEADO', 'ADMIN')")
     public ResponseEntity<List<Asignacion>> obtenerMisAsignaciones(Authentication authentication) {
         return ResponseEntity.ok(asignacionService.obtenerMisAsignaciones(authentication.getName()));
     }
-
 
     @Operation(
             summary = "Obtener asignación por ID",
@@ -47,6 +46,7 @@ public class AsignacionController {
             @ApiResponse(responseCode = "404", description = "Asignación no encontrada")
     })
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Asignacion> obtenerAsignacion(@PathVariable Integer id) {
         return ResponseEntity.ok(asignacionService.obtenerAsignacionPorId(id));
     }
@@ -57,8 +57,20 @@ public class AsignacionController {
     )
     @ApiResponse(responseCode = "200", description = "Lista obtenida correctamente")
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Asignacion>> obtenerTodos() {
         return ResponseEntity.ok(asignacionService.obtenerTodosLasAsignaciones());
+    }
+
+    @Operation(
+            summary = "Obtener empleados disponibles",
+            description = "Devuelve las personas habilitadas como empleados o administradores para ser asignadas a vuelos"
+    )
+    @ApiResponse(responseCode = "200", description = "Lista de empleados obtenida correctamente")
+    @GetMapping("/empleados")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<Persona>> obtenerEmpleadosDisponibles() {
+        return ResponseEntity.ok(asignacionService.obtenerEmpleadosDisponibles());
     }
 
     @Operation(
@@ -67,10 +79,12 @@ public class AsignacionController {
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Asignación creada correctamente"),
-            @ApiResponse(responseCode = "400", description = "Datos inválidos")
+            @ApiResponse(responseCode = "400", description = "Datos inválidos o vuelo finalizado/cancelado"),
+            @ApiResponse(responseCode = "409", description = "Conflicto por duplicado o superposición horaria")
     })
     @PostMapping
-    public ResponseEntity<Asignacion> crearAsignacion(@RequestBody Asignacion asignacion) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Asignacion> crearAsignacion(@Valid @RequestBody AsignacionDTO asignacion) {
         Asignacion nuevo = asignacionService.crearAsignacion(asignacion);
         return ResponseEntity.status(HttpStatus.CREATED).body(nuevo);
     }
@@ -81,13 +95,15 @@ public class AsignacionController {
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Asignación actualizada correctamente"),
-            @ApiResponse(responseCode = "404", description = "Asignación no encontrada")
+            @ApiResponse(responseCode = "400", description = "Datos inválidos"),
+            @ApiResponse(responseCode = "404", description = "Asignación no encontrada"),
+            @ApiResponse(responseCode = "409", description = "Conflicto por duplicado o superposición horaria")
     })
     @PutMapping("/{id}")
-    public ResponseEntity<Asignacion> actualizarAsignacion(@PathVariable Integer id, @RequestBody Asignacion asignacion) {
-        return ResponseEntity.ok(asignacionService.EditarAeropuerto(id, asignacion));
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Asignacion> actualizarAsignacion(@PathVariable Integer id, @Valid @RequestBody AsignacionDTO asignacion) {
+        return ResponseEntity.ok(asignacionService.actualizarAsignacion(id, asignacion));
     }
-
 
     @Operation(
             summary = "Eliminar asignación",
@@ -98,12 +114,9 @@ public class AsignacionController {
             @ApiResponse(responseCode = "404", description = "Asignación no encontrada")
     })
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> eliminarAsignacion(@PathVariable Integer id) {
         asignacionService.eliminarAsignacion(id);
         return ResponseEntity.noContent().build();
     }
-
-
-
-
 }

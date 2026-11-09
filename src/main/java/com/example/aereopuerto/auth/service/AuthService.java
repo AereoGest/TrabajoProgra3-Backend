@@ -118,7 +118,7 @@ public class AuthService {
 
         return usuarios.stream()
                 .map(user -> UsuarioResponse.builder()
-                        .id(user.getId())
+                        .id(user.getId()).personaId(user.getPersona() != null ? user.getPersona().getId() : null)
                         .nombre(user.getPersona().getNombre())
                         .apellido(user.getPersona().getApellido())
                         .email(user.getEmail())
@@ -137,7 +137,7 @@ public class AuthService {
         Persona persona = user.getPersona();
 
         return UsuarioResponse.builder()
-                .id(user.getId())
+                .id(user.getId()).personaId(user.getPersona() != null ? user.getPersona().getId() : null)
                 .nombre(persona.getNombre())
                 .apellido(persona.getApellido())
                 .email(user.getEmail())

@@ -6,8 +6,11 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
-
 @Repository
 public interface AsignacionRepository extends JpaRepository<Asignacion, Integer> {
     List<Asignacion> findByEmpleadoIdOrderByVueloFechaSalidaAscVueloHoraSalidaAsc(Integer personaId);
+    List<Asignacion> findByEmpleadoId(Integer personaId);
+    List<Asignacion> findByVueloId(Integer vueloId);
+    boolean existsByVueloIdAndEmpleadoId(Integer vueloId, Integer personaId);
+    boolean existsByVueloIdAndEmpleadoIdAndIdNot(Integer vueloId, Integer personaId, Integer id);
 }

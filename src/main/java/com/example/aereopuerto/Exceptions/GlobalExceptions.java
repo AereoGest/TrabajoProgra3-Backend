@@ -39,7 +39,7 @@ public class GlobalExceptions {
 
     @ExceptionHandler({IllegalArgumentException.class, PersonaInvalidaException.class,
             ReservaInvalidaException.class, VueloInvalidoException.class,
-            CarritoInvalidoException.class, FavoritoInvalidoException.class})
+            CarritoInvalidoException.class, FavoritoInvalidoException.class, AsignacionInvalidaException.class})
     public ResponseEntity<ErrorResponse> badRequest(RuntimeException ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
     }
@@ -88,7 +88,7 @@ public class GlobalExceptions {
         return build(HttpStatus.FORBIDDEN, "No tenés permisos para acceder a este recurso", request);
     }
 
-    @ExceptionHandler({AsignacionInvalidaException.class, AvionInvalidoException.class,
+    @ExceptionHandler({AvionInvalidoException.class,
             FacturaInvalidaException.class, AeropuertoInvalidoException.class,
             PasajeInvalidoException.class, EquipajeInvalidoException.class,
             AsistenciaInvalidaException.class, AsientoInvalidoException.class})

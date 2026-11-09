@@ -73,7 +73,8 @@ public class SecurityConfig {
                                                 "/api/reservas",
                                                 "/api/pasajes",
                                                 "/api/equipajes",
-                                                "/api/asistenciasAlViajero"
+                                                "/api/asistenciasAlViajero",
+                                                "/api/asignacion"
                         ).hasRole("ADMIN")
 
                         .requestMatchers(
@@ -83,7 +84,8 @@ public class SecurityConfig {
                                                 "/api/facturas/{id}",
                                                 "/api/pasajes/{id}",
                                                 "/api/equipajes/{id}",
-                                                "/api/asistenciasAlViajero/{id}"
+                                                "/api/asistenciasAlViajero/{id}",
+                                                "/api/asignacion/{id}"
                         ).hasRole("ADMIN")
 
                         .requestMatchers(
@@ -93,7 +95,8 @@ public class SecurityConfig {
                                                   "/api/vuelos/{id}",
                                                   "/api/personas/{id}",
                                                   "/api/facturas/{id}",
-                                                  "/api/pasajes/{id}"
+                                                  "/api/pasajes/{id}",
+                                                  "/api/asignacion/{id}"
 
                         ).hasRole("ADMIN")
 
@@ -111,9 +114,16 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 "/api/aviones/**",
-                                "/api/asignacion/**",
                                 "/api/aeropuertos/**"
                         ).hasAnyRole("EMPLEADO", "ADMIN")
+
+                        .requestMatchers(
+                                "/api/asignacion/mias"
+                        ).hasAnyRole("EMPLEADO", "ADMIN")
+
+                        .requestMatchers(
+                                "/api/asignacion/**"
+                        ).hasRole("ADMIN")
 
                         .anyRequest().authenticated()
                 )

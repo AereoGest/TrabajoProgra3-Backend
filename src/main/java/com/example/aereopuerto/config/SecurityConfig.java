@@ -61,6 +61,7 @@ public class SecurityConfig {
                                                 "/api/reservas/filtrar",
                                                 "/api/pasajes",
                                                 "/api/pasajes/{id}",
+                                                "/api/pasajes/reserva/{reservaId}",
                                                 "/api/personas",
                                                 "/api/personas/{id}",
                                                 "/api/personas/filtrar"

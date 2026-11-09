@@ -1,7 +1,7 @@
 package com.example.aereopuerto.dto;
 
 import com.example.aereopuerto.model.enums.ClasesVuelo;
-
+import com.example.aereopuerto.model.enums.Identificador;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -15,7 +15,6 @@ public class PasajeDTO {
     private String codigoPasaje;
     private Integer reservaId;
 
-    @NotNull
     private Integer vueloId;
     private Integer asientoId;
     @NotNull
@@ -27,6 +26,7 @@ public class PasajeDTO {
     private String nombre;
     @NotBlank
     private String apellido;
+    private Identificador tipoDocumento;
     @NotBlank
     private String documento;
     private LocalDate fechaNacimiento;

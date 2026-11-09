@@ -8,9 +8,11 @@ import com.example.aereopuerto.auth.entity.Role;
 import com.example.aereopuerto.auth.service.AuthService;
 import com.example.aereopuerto.auth.service.JwtService;
 import com.example.aereopuerto.auth.service.UserService;
+import com.example.aereopuerto.controller.PasajeController;
 import com.example.aereopuerto.controller.ReservaController;
 import com.example.aereopuerto.controller.VueloController;
 import com.example.aereopuerto.service.CheckinService;
+import com.example.aereopuerto.service.PasajeService;
 import com.example.aereopuerto.service.ReservaService;
 import com.example.aereopuerto.service.VueloService;
 import org.junit.jupiter.api.DisplayName;
@@ -37,7 +39,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = {VueloController.class, AuthController.class, UserController.class, ReservaController.class})
+@WebMvcTest(controllers = {VueloController.class, AuthController.class, UserController.class, ReservaController.class, PasajeController.class})
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class})
 class SecurityAuthorizationTest {
 
@@ -55,6 +57,9 @@ class SecurityAuthorizationTest {
 
     @MockitoBean
     private ReservaService reservaService;
+
+    @MockitoBean
+    private PasajeService pasajeService;
 
     @MockitoBean
     private CheckinService checkinService;
@@ -212,5 +217,33 @@ class SecurityAuthorizationTest {
                 .andExpect(status().isNoContent());
 
         verify(reservaService).cancelarReserva(1);
+    }
+
+    @Test
+    @WithMockUser(roles = "EMPLEADO")
+    @DisplayName("PUT /api/pasajes/10 con rol EMPLEADO devuelve 403 Forbidden")
+    void actualizarPasaje_ConRolEmpleado_Retorna403() throws Exception {
+        mockMvc.perform(put("/api/pasajes/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"clasesVuelo\":\"ECONOMICA\",\"nombre\":\"Juan\",\"apellido\":\"Perez\",\"documento\":\"35111222\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "USUARIO")
+    @DisplayName("DELETE /api/pasajes/10 con rol USUARIO devuelve 403 Forbidden")
+    void eliminarPasaje_ConRolUsuario_Retorna403() throws Exception {
+        mockMvc.perform(delete("/api/pasajes/10"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("DELETE /api/pasajes/10?reservaId=50 con rol ADMIN cancela el pasaje y devuelve 204 No Content")
+    void eliminarPasaje_ConRolAdmin_Retorna204() throws Exception {
+        mockMvc.perform(delete("/api/pasajes/10").param("reservaId", "50"))
+                .andExpect(status().isNoContent());
+
+        verify(pasajeService).cancelarPasajeDeReserva(10, 50);
     }
 }

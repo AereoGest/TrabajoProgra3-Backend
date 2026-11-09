@@ -1,27 +1,77 @@
 package com.example.aereopuerto.auth.controller;
 
+import com.example.aereopuerto.auth.dto.ActualizarClienteAdminRequest;
+import com.example.aereopuerto.auth.dto.CrearClienteAdminRequest;
+import com.example.aereopuerto.auth.dto.UsuarioResponse;
 import com.example.aereopuerto.auth.entity.Role;
 import com.example.aereopuerto.auth.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
-@Tag(name = "Usuarios Admin", description = "Gestión de roles de usuarios (solo ADMIN)")
+@Tag(name = "Usuarios Admin", description = "Gestión integral de clientes y usuarios (solo ADMIN)")
 public class UserController {
 
     private final UserService userService;
+
+    @Operation(
+            summary = "Crear cliente / usuario",
+            description = "Da de alta un nuevo cliente con su perfil completo y rol asignado. Solo ADMIN."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Cliente creado exitosamente"),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos o documento/email duplicado"),
+            @ApiResponse(responseCode = "403", description = "No autorizado")
+    })
+    @PostMapping
+    public ResponseEntity<UsuarioResponse> crearCliente(@Valid @RequestBody CrearClienteAdminRequest request) {
+        UsuarioResponse nuevo = userService.crearCliente(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(nuevo);
+    }
+
+    @Operation(
+            summary = "Actualizar cliente / usuario",
+            description = "Modifica los datos personales y de cuenta de un cliente existente. Solo ADMIN."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Cliente actualizado exitosamente"),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos o conflicto de datos"),
+            @ApiResponse(responseCode = "403", description = "No autorizado"),
+            @ApiResponse(responseCode = "404", description = "Usuario no encontrado")
+    })
+    @PutMapping("/{id}")
+    public ResponseEntity<UsuarioResponse> actualizarCliente(
+            @PathVariable Integer id,
+            @Valid @RequestBody ActualizarClienteAdminRequest request) {
+        return ResponseEntity.ok(userService.actualizarCliente(id, request));
+    }
+
+    @Operation(
+            summary = "Eliminar cliente / usuario",
+            description = "Elimina un usuario y su persona si no posee reservas o asignaciones asociadas. Solo ADMIN."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Cliente eliminado exitosamente"),
+            @ApiResponse(responseCode = "400", description = "No se puede eliminar por integridad referencial"),
+            @ApiResponse(responseCode = "403", description = "No autorizado"),
+            @ApiResponse(responseCode = "404", description = "Usuario no encontrado")
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminarCliente(@PathVariable Integer id) {
+        userService.eliminarCliente(id);
+        return ResponseEntity.noContent().build();
+    }
 
     @Operation(
             summary = "Convertir usuario en empleado",

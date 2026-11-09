@@ -11,6 +11,7 @@ import java.util.List;
 public interface AsignacionRepository extends JpaRepository<Asignacion, Integer>, JpaSpecificationExecutor<Asignacion> {
     List<Asignacion> findByEmpleadoIdOrderByVueloFechaSalidaAscVueloHoraSalidaAsc(Integer personaId);
     List<Asignacion> findByEmpleadoId(Integer personaId);
+    boolean existsByEmpleadoId(Integer personaId);
     List<Asignacion> findByVueloId(Integer vueloId);
     boolean existsByVueloIdAndEmpleadoId(Integer vueloId, Integer personaId);
     boolean existsByVueloIdAndEmpleadoIdAndIdNot(Integer vueloId, Integer personaId, Integer id);

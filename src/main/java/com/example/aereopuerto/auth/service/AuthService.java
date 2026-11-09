@@ -57,7 +57,7 @@ public class AuthService {
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("El email ya está registrado");
+            throw new IllegalArgumentException("El email ya estÃ¡ registrado");
         }
 
         Persona persona = new Persona();
@@ -117,14 +117,7 @@ public class AuthService {
         List<User> usuarios = userRepository.findAll();
 
         return usuarios.stream()
-                .map(user -> UsuarioResponse.builder()
-                        .id(user.getId()).personaId(user.getPersona() != null ? user.getPersona().getId() : null)
-                        .nombre(user.getPersona().getNombre())
-                        .apellido(user.getPersona().getApellido())
-                        .email(user.getEmail())
-                        .telefono(user.getTelefono())
-                        .role(user.getRole())
-                        .build())
+                .map(this::mapearUsuarioResponse)
                 .toList();
     }
 
@@ -134,15 +127,23 @@ public class AuthService {
                 .orElseThrow(() ->
                         new IllegalArgumentException("Usuario no encontrado"));
 
-        Persona persona = user.getPersona();
+        return mapearUsuarioResponse(user);
+    }
 
+    public UsuarioResponse mapearUsuarioResponse(User user) {
+        Persona persona = user.getPersona();
         return UsuarioResponse.builder()
-                .id(user.getId()).personaId(user.getPersona() != null ? user.getPersona().getId() : null)
-                .nombre(persona.getNombre())
-                .apellido(persona.getApellido())
+                .id(user.getId())
+                .personaId(persona != null ? persona.getId() : null)
+                .nombre(persona != null ? persona.getNombre() : null)
+                .apellido(persona != null ? persona.getApellido() : null)
                 .email(user.getEmail())
                 .telefono(user.getTelefono())
                 .role(user.getRole())
+                .identificador(persona != null ? persona.getIdentificador() : null)
+                .numeroIdentificador(persona != null ? persona.getNumeroIdentificador() : null)
+                .fechaNacimiento(persona != null ? persona.getFechaNacimiento() : null)
+                .sexo(persona != null ? persona.getSexo() : null)
                 .build();
     }
 
@@ -166,7 +167,7 @@ public class AuthService {
         personaRepository.findByNumeroIdentificador(request.getNumeroIdentificador())
                 .ifPresent(existing -> {
                     if (!existing.getId().equals(persona.getId())) {
-                        throw new IllegalArgumentException("El número de documento ya está registrado por otro usuario.");
+                        throw new IllegalArgumentException("El nÃºmero de documento ya estÃ¡ registrado por otro usuario.");
                     }
                 });
 
@@ -206,10 +207,10 @@ public class AuthService {
 
     public AuthResponse verifyEmail(String token) {
         if (token == null || token.trim().isEmpty()) {
-            throw new IllegalArgumentException("Token de verificación inválido o ausente");
+            throw new IllegalArgumentException("Token de verificaciÃ³n invÃ¡lido o ausente");
         }
         User user = userRepository.findByVerificationToken(token.trim())
-                .orElseThrow(() -> new IllegalArgumentException("Token inválido"));
+                .orElseThrow(() -> new IllegalArgumentException("Token invÃ¡lido"));
 
         user.setIsVerified(true);
         user.setVerificationToken(null);
@@ -223,10 +224,10 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
         if (user.getTwoFactorCode() == null || user.getTwoFactorCodeExpiry() == null || user.getTwoFactorCodeExpiry().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("El código 2FA ha expirado o no es válido. Vuelve a iniciar sesión.");
+            throw new IllegalArgumentException("El cÃ³digo 2FA ha expirado o no es vÃ¡lido. Vuelve a iniciar sesiÃ³n.");
         }
         if (!request.getCode().trim().equals(user.getTwoFactorCode())) {
-            throw new IllegalArgumentException("Código 2FA incorrecto");
+            throw new IllegalArgumentException("CÃ³digo 2FA incorrecto");
         }
 
         user.setTwoFactorCode(null);
@@ -245,7 +246,7 @@ public class AuthService {
             }
         }
         if (targetEmail == null || targetEmail.isBlank()) {
-            throw new IllegalArgumentException("El correo electrónico es obligatorio");
+            throw new IllegalArgumentException("El correo electrÃ³nico es obligatorio");
         }
 
         User user = userRepository.findByEmail(targetEmail.trim())
@@ -273,13 +274,13 @@ public class AuthService {
 
     public void resetPassword(ResetPasswordRequest request) {
         if (request == null || request.getToken() == null || request.getToken().trim().isEmpty()) {
-            throw new IllegalArgumentException("Token de restablecimiento inválido o ausente");
+            throw new IllegalArgumentException("Token de restablecimiento invÃ¡lido o ausente");
         }
         if (request.getNewPassword() == null || request.getNewPassword().length() < 8) {
-            throw new IllegalArgumentException("La contraseña debe tener al menos 8 caracteres");
+            throw new IllegalArgumentException("La contraseÃ±a debe tener al menos 8 caracteres");
         }
         User user = userRepository.findByResetToken(request.getToken().trim())
-                .orElseThrow(() -> new IllegalArgumentException("Token inválido o expirado"));
+                .orElseThrow(() -> new IllegalArgumentException("Token invÃ¡lido o expirado"));
 
         if (user.getResetTokenExpiry() == null || user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException("El token ha expirado. Solicita un nuevo restablecimiento.");

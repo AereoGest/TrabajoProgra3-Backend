@@ -12,6 +12,8 @@ import java.util.List;
 @Repository
 public interface ReservaRepository extends JpaRepository<Reserva, Integer>, JpaSpecificationExecutor<Reserva> {
     List<Reserva> findByPersona(Persona persona);
+    boolean existsByPersona(Persona persona);
+    boolean existsByPersonaId(Integer personaId);
     boolean existsByCodigoReserva (String codigoReserva);
     Optional<Reserva> findByCodigoReservaIgnoreCase(String codigoReserva);
 }

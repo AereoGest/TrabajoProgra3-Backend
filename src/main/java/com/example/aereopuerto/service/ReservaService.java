@@ -61,18 +61,17 @@ public class ReservaService {
 
     @Cacheable(value = "reservas", key = "#id")
     public Reserva obtenerReservaPorId(Integer id) {
-        return reservaRepository.findById(id)
+        Reserva reserva = reservaRepository.findById(id)
                 .orElseThrow(() -> new ReservaInvalidaException("Reserva no encontrada. ID: " + id));
+        enriquecerEmailPersona(reserva);
+        return reserva;
     }
 
     @Cacheable(value = "reservas", key = "'todos'")
     public List<Reserva> obtenerTodasLasReservas() {
         List<Reserva> reservas = reservaRepository.findAll();
         for (Reserva r : reservas) {
-            if (r.getPersona() != null) {
-                userRepository.findByPersonaId(r.getPersona().getId())
-                        .ifPresent(u -> r.getPersona().setEmail(u.getEmail()));
-            }
+            enriquecerEmailPersona(r);
         }
         return reservas;
     }
@@ -185,7 +184,9 @@ public class ReservaService {
         }
 
         reserva.setValor(calcularTotal(base, extras));
-        return reservaRepository.save(reserva);
+        Reserva guardada = reservaRepository.save(reserva);
+        enriquecerEmailPersona(guardada);
+        return guardada;
     }
 
     @Transactional
@@ -249,9 +250,9 @@ public class ReservaService {
             if (p.getAsiento() != null) {
                 p.getAsiento().setOcupado(false);
                 asientoRepository.save(p.getAsiento());
+                p.setAsiento(null);
             }
         }
-        reserva.getPasajes().clear();
         reserva.setEstadoReserva(EstadoReserva.CANCELADA);
         reservaRepository.save(reserva);
     }
@@ -304,8 +305,11 @@ public class ReservaService {
     }
 
     private void normalizar(PasajeRequest p) {
-        p.setNombre(p.getNombre().trim());
-        p.setApellido(p.getApellido().trim());
+        if (p.getDocumento() == null || p.getDocumento().isBlank() || p.getTipoDocumento() == null) {
+            throw new ReservaInvalidaException("El tipo y número de documento son obligatorios");
+        }
+        p.setNombre(p.getNombre() != null ? p.getNombre().trim() : "");
+        p.setApellido(p.getApellido() != null ? p.getApellido().trim() : "");
         p.setDocumento(p.getDocumento().replaceAll("[\\s.\\-]", "").toUpperCase());
         p.setEmail(p.getEmail() == null || p.getEmail().isBlank() ? null : p.getEmail().trim());
     }
@@ -325,25 +329,66 @@ public class ReservaService {
         return codigo;
     }
 
-    @CachePut(value = "reservas", key = "#result.id")
-    @CacheEvict(value = "reservas", key = "'todos'")
+    @Transactional
+    @CacheEvict(value = "reservas", allEntries = true)
     public Reserva actualizarReserva(Integer id, ReservaDTO reservaDTO) {
+        if (reservaDTO == null) {
+            throw new ReservaInvalidaException("Los datos de la reserva son obligatorios");
+        }
 
         Reserva reserva = reservaRepository.findById(id)
                 .orElseThrow(() -> new ReservaInvalidaException(
                         "Reserva no encontrada. ID: " + id));
 
+        if (reservaDTO.getClienteId() == null) {
+            throw new PersonaInvalidaException("El titular de la reserva es obligatorio");
+        }
         Persona persona = personaRepository.findById(reservaDTO.getClienteId())
                 .orElseThrow(() -> new PersonaInvalidaException(
                         "Usuario no encontrado. ID: " + reservaDTO.getClienteId()));
 
+        if (reservaDTO.getValor() == null || reservaDTO.getValor() < 0) {
+            throw new ReservaInvalidaException("El valor de la reserva debe ser mayor o igual a cero");
+        }
+        if (reservaDTO.getEstadoReserva() == null) {
+            throw new ReservaInvalidaException("El estado de la reserva es obligatorio");
+        }
+
+        if (reserva.getEstadoReserva() == EstadoReserva.CANCELADA
+                && reservaDTO.getEstadoReserva() != EstadoReserva.CANCELADA) {
+            throw new ReservaInvalidaException(
+                    "No se puede reactivar una reserva que ya fue cancelada");
+        }
+
         reserva.setPersona(persona);
         reserva.setValor(BigDecimal.valueOf(reservaDTO.getValor()));
-        reserva.setCantidadPasajes(reservaDTO.getCantidadPasajes());
-        reserva.setEstadoReserva(reservaDTO.getEstadoReserva());
-        reserva.setFechaReserva(reservaDTO.getFechaReserva());
 
-        return reservaRepository.save(reserva);
+        if (reservaDTO.getFechaReserva() != null) {
+            reserva.setFechaReserva(reservaDTO.getFechaReserva());
+        }
+
+        if (reservaDTO.getEstadoReserva() == EstadoReserva.CANCELADA
+                && reserva.getEstadoReserva() != EstadoReserva.CANCELADA) {
+            liberarAsientosYCancelar(reserva);
+        } else {
+            reserva.setEstadoReserva(reservaDTO.getEstadoReserva());
+            if (reserva.getPasajes() != null && !reserva.getPasajes().isEmpty()) {
+                reserva.setCantidadPasajes(reserva.getPasajes().size());
+            } else if (reservaDTO.getCantidadPasajes() != null && reservaDTO.getCantidadPasajes() >= 0) {
+                reserva.setCantidadPasajes(reservaDTO.getCantidadPasajes());
+            }
+        }
+
+        Reserva guardada = reservaRepository.save(reserva);
+        enriquecerEmailPersona(guardada);
+        return guardada;
+    }
+
+    private void enriquecerEmailPersona(Reserva r) {
+        if (r != null && r.getPersona() != null && r.getPersona().getId() != null) {
+            userRepository.findByPersonaId(r.getPersona().getId())
+                    .ifPresent(u -> r.getPersona().setEmail(u.getEmail()));
+        }
     }
 
     @Transactional
@@ -354,7 +399,7 @@ public class ReservaService {
                 .orElseThrow(() -> new ReservaInvalidaException("Reserva no encontrada"));
 
         if (reserva.getEstadoReserva() == EstadoReserva.CANCELADA) {
-            throw new IllegalArgumentException(
+            throw new ReservaInvalidaException(
                     "La reserva ya se encuentra cancelada");
         }
 
@@ -410,12 +455,14 @@ public class ReservaService {
         if (paymentMethodId == null) return MetodosDePago.MERCADOPAGO;
         return METODOS_DE_PAGO.getOrDefault(paymentMethodId.toLowerCase(), MetodosDePago.MERCADOPAGO);
     }
+    @Transactional
     @Caching(evict = {
             @CacheEvict(value = "reservas", key = "#id"),
-            @CacheEvict(value = "reservas", key = "'todos'")
+            @CacheEvict(value = "reservas", key = "'todos'"),
+            @CacheEvict(value = "reservas", allEntries = true)
     })
     public void eliminarReserva(Integer id) {
-        reservaRepository.deleteById(id);
+        cancelarReserva(id);
     }
 
     public List<Reserva> buscarTodasReservasConFiltros(

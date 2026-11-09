@@ -2,6 +2,7 @@ package com.example.aereopuerto.service;
 
 import com.example.aereopuerto.Exceptions.PersonaInvalidaException;
 import com.example.aereopuerto.Specifications.PersonaSpecification;
+import com.example.aereopuerto.auth.repository.UserRepository;
 import com.example.aereopuerto.model.Persona;
 import com.example.aereopuerto.model.enums.Identificador;
 import com.example.aereopuerto.model.enums.Sexo;
@@ -24,15 +25,28 @@ public class PersonaService {
 
     @Autowired
     private final PersonaRepository personaRepository;
+    private final UserRepository userRepository;
 
     @Cacheable(value = "clientes", key = "#id")
     public Persona obtenerClientePorId(Integer id) {
-        return personaRepository.findById(id).orElseThrow(() -> new PersonaInvalidaException("Persona no encontrado. ID: " + id));
+        Persona persona = personaRepository.findById(id)
+                .orElseThrow(() -> new PersonaInvalidaException("Persona no encontrado. ID: " + id));
+        enriquecerEmail(persona);
+        return persona;
     }
 
     @Cacheable(value = "clientes", key = "'todos'")
     public List<Persona> obtenerTodosLosClientes() {
-        return personaRepository.findAll();
+        List<Persona> personas = personaRepository.findAll();
+        personas.forEach(this::enriquecerEmail);
+        return personas;
+    }
+
+    private void enriquecerEmail(Persona persona) {
+        if (persona != null && persona.getId() != null && userRepository != null) {
+            userRepository.findByPersonaId(persona.getId())
+                    .ifPresent(u -> persona.setEmail(u.getEmail()));
+        }
     }
 
     @CachePut(value = "clientes", key = "#result.id")
@@ -88,8 +102,9 @@ public class PersonaService {
                 .and(PersonaSpecification.porSexo(sexo))
                 .and(PersonaSpecification.porFechaNacimiento(fechaNacimiento));
 
-        return personaRepository.findAll(spec);
+        List<Persona> personas = personaRepository.findAll(spec);
+        personas.forEach(this::enriquecerEmail);
+        return personas;
     }
-
 
 }

@@ -57,6 +57,7 @@ public class SecurityConfig {
                                                 "/api/auth/usuarios",
                                                 "/api/auth/usuarios/{id}",
                                                 "/api/reservas",
+                                                "/api/reservas/{id}",
                                                 "/api/reservas/filtrar",
                                                 "/api/pasajes",
                                                 "/api/pasajes/{id}",
@@ -68,6 +69,7 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 HttpMethod.POST, "/api/vuelos",
+                                                "/api/reservas",
                                                 "/api/pasajes",
                                                 "/api/equipajes",
                                                 "/api/asistenciasAlViajero"
@@ -75,6 +77,7 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 HttpMethod.PUT, "/api/vuelos/{id}",
+                                                "/api/reservas/{id}",
                                                 "/api/personas/{id}",
                                                 "/api/facturas/{id}",
                                                 "/api/pasajes/{id}",

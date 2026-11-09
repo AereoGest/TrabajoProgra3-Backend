@@ -8,13 +8,17 @@ import com.example.aereopuerto.auth.entity.Role;
 import com.example.aereopuerto.auth.service.AuthService;
 import com.example.aereopuerto.auth.service.JwtService;
 import com.example.aereopuerto.auth.service.UserService;
+import com.example.aereopuerto.controller.ReservaController;
 import com.example.aereopuerto.controller.VueloController;
+import com.example.aereopuerto.service.CheckinService;
+import com.example.aereopuerto.service.ReservaService;
 import com.example.aereopuerto.service.VueloService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -25,12 +29,15 @@ import java.util.List;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = {VueloController.class, AuthController.class, UserController.class})
+@WebMvcTest(controllers = {VueloController.class, AuthController.class, UserController.class, ReservaController.class})
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class})
 class SecurityAuthorizationTest {
 
@@ -45,6 +52,12 @@ class SecurityAuthorizationTest {
 
     @MockitoBean
     private UserService userService;
+
+    @MockitoBean
+    private ReservaService reservaService;
+
+    @MockitoBean
+    private CheckinService checkinService;
 
     @MockitoBean
     private JwtService jwtService;
@@ -151,5 +164,53 @@ class SecurityAuthorizationTest {
         mockMvc.perform(get("/api/auth/perfil"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.role").value("ROLE_ADMIN"));
+    }
+
+    @Test
+    @WithMockUser(roles = "EMPLEADO")
+    @DisplayName("GET /api/reservas con rol EMPLEADO devuelve 403 Forbidden")
+    void obtenerReservas_ConRolEmpleado_Retorna403() throws Exception {
+        mockMvc.perform(get("/api/reservas"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("GET /api/reservas con rol ADMIN devuelve 200 OK")
+    void obtenerReservas_ConRolAdmin_Retorna200() throws Exception {
+        when(reservaService.obtenerTodasLasReservas()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/reservas"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "USUARIO")
+    @DisplayName("POST /api/reservas con rol USUARIO devuelve 403 Forbidden")
+    void crearReservaAdmin_ConRolUsuario_Retorna403() throws Exception {
+        mockMvc.perform(post("/api/reservas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "EMPLEADO")
+    @DisplayName("PUT /api/reservas/1 con rol EMPLEADO devuelve 403 Forbidden")
+    void actualizarReserva_ConRolEmpleado_Retorna403() throws Exception {
+        mockMvc.perform(put("/api/reservas/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("DELETE /api/reservas/1 con rol ADMIN ejecuta baja lógica y devuelve 204 No Content")
+    void eliminarReserva_ConRolAdmin_Retorna204() throws Exception {
+        mockMvc.perform(delete("/api/reservas/1"))
+                .andExpect(status().isNoContent());
+
+        verify(reservaService).cancelarReserva(1);
     }
 }

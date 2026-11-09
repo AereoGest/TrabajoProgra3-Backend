@@ -17,6 +17,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import com.example.aereopuerto.dto.TransaccionDTO;
+import com.example.aereopuerto.dto.VentaDiariaDTO;
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDate;
 
 import java.util.List;
 
@@ -56,6 +61,36 @@ public class FacturaController {
     @PreAuthorize("hasAnyRole('EMPLEADO', 'ADMIN')")
     public ResponseEntity<List<Factura>> obtenerTodas() {
         return ResponseEntity.ok(facturaService.obtenerTodasLasFacturas());
+    }
+
+    @Operation(
+            summary = "Ventas diarias",
+            description = "Total vendido y cantidad de transacciones por día entre dos fechas (inclusive). "
+                    + "Si no se mandan fechas, devuelve los últimos 30 días. Solo ADMIN."
+    )
+    @GetMapping("/admin/ventas-diarias")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<VentaDiariaDTO>> ventasDiarias(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+        LocalDate h = hasta != null ? hasta : LocalDate.now();
+        LocalDate d = desde != null ? desde : h.minusDays(29);
+        return ResponseEntity.ok(facturaService.obtenerVentasDiarias(d, h));
+    }
+
+    @Operation(
+            summary = "Historial de transacciones",
+            description = "Facturas emitidas entre dos fechas (inclusive), de la más reciente a la más antigua. "
+                    + "Si no se mandan fechas, devuelve los últimos 30 días. Solo ADMIN."
+    )
+    @GetMapping("/admin/transacciones")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<TransaccionDTO>> transacciones(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+        LocalDate h = hasta != null ? hasta : LocalDate.now();
+        LocalDate d = desde != null ? desde : h.minusDays(29);
+        return ResponseEntity.ok(facturaService.obtenerTransacciones(d, h));
     }
 
     @Operation(summary = "Crear factura", description = "Registra una nueva factura.")

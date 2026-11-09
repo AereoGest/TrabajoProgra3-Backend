@@ -1,5 +1,6 @@
 package com.example.aereopuerto.auth.service;
 
+import com.example.aereopuerto.Specifications.UserSpecification;
 import com.example.aereopuerto.auth.dto.ActualizarClienteAdminRequest;
 import com.example.aereopuerto.auth.dto.CrearClienteAdminRequest;
 import com.example.aereopuerto.auth.dto.UsuarioResponse;
@@ -8,6 +9,7 @@ import com.example.aereopuerto.auth.entity.User;
 import com.example.aereopuerto.auth.repository.UserRepository;
 import com.example.aereopuerto.model.Favorito;
 import com.example.aereopuerto.model.Persona;
+import com.example.aereopuerto.model.enums.Identificador;
 import com.example.aereopuerto.repository.AsignacionRepository;
 import com.example.aereopuerto.repository.CarritoRepository;
 import com.example.aereopuerto.repository.FavoritoRepository;
@@ -15,6 +17,8 @@ import com.example.aereopuerto.repository.PersonaRepository;
 import com.example.aereopuerto.repository.ReservaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -44,6 +48,41 @@ public class UserService {
 
         user.setRole(nuevoRol);
         userRepository.save(user);
+    }
+
+    public List<UsuarioResponse> buscarUsuariosConFiltros(
+            String texto,
+            Role role,
+            Identificador identificador,
+            String numeroIdentificador,
+            String orden) {
+
+        Specification<User> spec = Specification.where(UserSpecification.porTexto(texto))
+                .and(UserSpecification.porRole(role))
+                .and(UserSpecification.porIdentificador(identificador))
+                .and(UserSpecification.porNumeroIdentificador(numeroIdentificador));
+
+        Sort sort = Sort.by(Sort.Direction.ASC, "persona.apellido", "persona.nombre");
+        if ("NOMBRE_DESC".equalsIgnoreCase(orden)) {
+            sort = Sort.by(Sort.Direction.DESC, "persona.apellido", "persona.nombre");
+        } else if ("RECIENTES".equalsIgnoreCase(orden)) {
+            sort = Sort.by(Sort.Direction.DESC, "id");
+        } else if ("ANTIGUOS".equalsIgnoreCase(orden)) {
+            sort = Sort.by(Sort.Direction.ASC, "id");
+        }
+
+        List<User> usuarios = userRepository.findAll(spec, sort);
+        return usuarios.stream()
+                .map(authService::mapearUsuarioResponse)
+                .toList();
+    }
+
+    public List<UsuarioResponse> buscarEmpleadosConFiltros(
+            String texto,
+            Identificador identificador,
+            String numeroIdentificador,
+            String orden) {
+        return buscarUsuariosConFiltros(texto, Role.ROLE_EMPLEADO, identificador, numeroIdentificador, orden);
     }
 
     @Transactional

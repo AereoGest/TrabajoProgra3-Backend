@@ -5,6 +5,7 @@ import com.example.aereopuerto.auth.dto.CrearClienteAdminRequest;
 import com.example.aereopuerto.auth.dto.UsuarioResponse;
 import com.example.aereopuerto.auth.entity.Role;
 import com.example.aereopuerto.auth.service.UserService;
+import com.example.aereopuerto.model.enums.Identificador;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -16,6 +17,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
@@ -24,6 +27,39 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+
+    @Operation(
+            summary = "Filtrar usuarios",
+            description = "Filtra usuarios multicriterio por texto, rol, tipo de documento y número. Solo ADMIN."
+    )
+    @ApiResponse(responseCode = "200", description = "Lista filtrada de usuarios obtenida exitosamente")
+    @GetMapping("/filtrar")
+    public ResponseEntity<List<UsuarioResponse>> buscarUsuarios(
+            @RequestParam(required = false) String texto,
+            @RequestParam(required = false) Role role,
+            @RequestParam(required = false) Identificador identificador,
+            @RequestParam(required = false) String numeroIdentificador,
+            @RequestParam(required = false, defaultValue = "NOMBRE_ASC") String orden) {
+
+        return ResponseEntity.ok(userService.buscarUsuariosConFiltros(
+                texto, role, identificador, numeroIdentificador, orden));
+    }
+
+    @Operation(
+            summary = "Filtrar lista de empleados",
+            description = "Filtra exclusivamente la lista de empleados (ROLE_EMPLEADO) por texto, documento y orden. Solo ADMIN."
+    )
+    @ApiResponse(responseCode = "200", description = "Lista filtrada de empleados obtenida exitosamente")
+    @GetMapping("/empleados")
+    public ResponseEntity<List<UsuarioResponse>> buscarEmpleados(
+            @RequestParam(required = false) String texto,
+            @RequestParam(required = false) Identificador identificador,
+            @RequestParam(required = false) String numeroIdentificador,
+            @RequestParam(required = false, defaultValue = "NOMBRE_ASC") String orden) {
+
+        return ResponseEntity.ok(userService.buscarEmpleadosConFiltros(
+                texto, identificador, numeroIdentificador, orden));
+    }
 
     @Operation(
             summary = "Crear cliente / usuario",

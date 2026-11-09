@@ -284,7 +284,7 @@ class UserServiceTest {
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> userService.eliminarCliente(1));
         assertTrue(ex.getMessage().contains("reservas"));
-        verify(userRepository, never()).delete(any());
+        verify(userRepository, never()).delete(any(User.class));
     }
 
     @Test
@@ -301,7 +301,7 @@ class UserServiceTest {
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> userService.eliminarCliente(1));
         assertTrue(ex.getMessage().contains("asignaciones"));
-        verify(userRepository, never()).delete(any());
+        verify(userRepository, never()).delete(any(User.class));
     }
 
     @Test
@@ -316,6 +316,61 @@ class UserServiceTest {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> userService.eliminarCliente(1));
         assertTrue(ex.getMessage().contains("propia cuenta"));
-        verify(userRepository, never()).delete(any());
+        verify(userRepository, never()).delete(any(User.class));
+    }
+
+    @Test
+    @DisplayName("buscarUsuariosConFiltros: consulta con especificación y ordenamiento")
+    void buscarUsuariosConFiltros_exitoso() {
+        when(userRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(java.util.List.of(userBase));
+        when(authService.mapearUsuarioResponse(userBase)).thenReturn(
+                UsuarioResponse.builder()
+                        .id(1)
+                        .nombre("Juan")
+                        .apellido("Pérez")
+                        .email("juan.perez@example.com")
+                        .role(Role.ROLE_USUARIO)
+                        .build()
+        );
+
+        java.util.List<UsuarioResponse> res = userService.buscarUsuariosConFiltros(
+                "Juan", Role.ROLE_USUARIO, Identificador.DNI, "35111222", "NOMBRE_ASC"
+        );
+
+        assertNotNull(res);
+        assertEquals(1, res.size());
+        assertEquals("Juan", res.get(0).getNombre());
+    }
+
+    @Test
+    @DisplayName("buscarEmpleadosConFiltros: filtra exclusivamente empleados")
+    void buscarEmpleadosConFiltros_exitoso() {
+        User empleado = User.builder()
+                .id(2)
+                .persona(personaBase)
+                .email("empleado@example.com")
+                .role(Role.ROLE_EMPLEADO)
+                .build();
+
+        when(userRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(java.util.List.of(empleado));
+        when(authService.mapearUsuarioResponse(empleado)).thenReturn(
+                UsuarioResponse.builder()
+                        .id(2)
+                        .nombre("Juan")
+                        .apellido("Pérez")
+                        .email("empleado@example.com")
+                        .role(Role.ROLE_EMPLEADO)
+                        .build()
+        );
+
+        java.util.List<UsuarioResponse> res = userService.buscarEmpleadosConFiltros(
+                "Pérez", Identificador.DNI, "35111222", "NOMBRE_DESC"
+        );
+
+        assertNotNull(res);
+        assertEquals(1, res.size());
+        assertEquals(Role.ROLE_EMPLEADO, res.get(0).getRole());
     }
 }

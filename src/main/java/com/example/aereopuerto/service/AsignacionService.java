@@ -2,8 +2,10 @@ package com.example.aereopuerto.service;
 
 
 import com.example.aereopuerto.Exceptions.AsignacionInvalidaException;
+import com.example.aereopuerto.auth.service.UsuarioAutenticadoService;
 import com.example.aereopuerto.model.Aeropuerto;
 import com.example.aereopuerto.model.Asignacion;
+import com.example.aereopuerto.model.Persona;
 import com.example.aereopuerto.repository.AsignacionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +24,8 @@ public class AsignacionService {
 
     @Autowired
     private AsignacionRepository asignacionRepository;
+    @Autowired
+    private UsuarioAutenticadoService usuarioAutenticadoService;
 
     @Cacheable(value = "asignacion", key = "#id")
     public Asignacion obtenerAsignacionPorId(Integer id) {
@@ -62,5 +66,15 @@ public class AsignacionService {
 
     @CacheEvict(value = "asignacion", key = "'todas'")
     public void invalidarListaDeAsignaciones() {
+    }
+
+
+    /**
+     * Devuelve las asignaciones del empleado logueado (sale del token).
+     * No se cachea porque depende del usuario.
+     */
+    public List<Asignacion> obtenerMisAsignaciones(String email) {
+        Persona empleado = usuarioAutenticadoService.getPersonaPorEmail(email);
+        return asignacionRepository.findByEmpleadoIdOrderByVueloFechaSalidaAscVueloHoraSalidaAsc(empleado.getId());
     }
 }

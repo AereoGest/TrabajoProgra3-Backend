@@ -39,7 +39,7 @@ El sistema se encuentra completamente desplegado y operativo en ambiente de prod
 | **Franco Rodriguez** | Desarrollador Full-Stack |
 | **Celeste Souto** | Desarrolladora Full-Stack |
 
-* **Docente titular:** Prof. Rodrigo Soto (Programación IV)  
+* **Docente titular:** Prof. Rodrigo Soto (Programación III)  
 * **Cátedra de articulación:** Gestión de Desarrollo de Software  
 * **Fecha de defensa:** Noviembre de 2026
 

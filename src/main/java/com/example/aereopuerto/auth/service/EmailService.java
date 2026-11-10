@@ -7,6 +7,10 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.text.NumberFormat;
+import java.util.Locale;
+
 @Service
 @RequiredArgsConstructor
 public class EmailService {
@@ -63,7 +67,37 @@ public class EmailService {
                 code + "\n\n" +
                 "Si no intentaste iniciar sesion, ignora este mensaje.\n\n" +
                 "Saludos,\nEl equipo de AeroGest");
-        
+
         mailSender.send(message);
+    }
+
+    /** Aviso al cliente de que su reserva se canceló porque la aerolínea canceló el vuelo. */
+    @Async
+    public void sendVueloCanceladoEmail(String toEmail, String nombre, String codigoReserva,
+                                        String descripcionVuelo, BigDecimal montoReembolso) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("Tu vuelo fue cancelado - Reserva " + codigoReserva);
+
+        String saludo = (nombre == null || nombre.isBlank() || "Pendiente".equals(nombre))
+                ? "Hola,\n\n" : "Hola " + nombre + ",\n\n";
+
+        String reembolso = montoReembolso != null && montoReembolso.signum() > 0
+                ? "Vamos a reintegrarte el 100% de lo abonado: " + formatearMonto(montoReembolso) + ".\n\n"
+                : "Como la reserva todavía no estaba pagada, no se realizó ningún cobro.\n\n";
+
+        message.setText(saludo +
+                "Lamentamos informarte que el vuelo " + descripcionVuelo + " fue cancelado por la aerolínea.\n\n" +
+                "Tu reserva " + codigoReserva + " quedó cancelada.\n" +
+                reembolso +
+                "Podés ver el detalle en Mis reservas: " + frontendUrl + "/reservas\n\n" +
+                "Disculpá las molestias.\n\n" +
+                "Saludos,\nEl equipo de AeroGest");
+
+        mailSender.send(message);
+    }
+
+    private static String formatearMonto(BigDecimal monto) {
+        return NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-AR")).format(monto);
     }
 }

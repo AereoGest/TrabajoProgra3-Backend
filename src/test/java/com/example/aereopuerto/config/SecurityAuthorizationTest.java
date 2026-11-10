@@ -16,6 +16,7 @@ import com.example.aereopuerto.model.Asignacion;
 import com.example.aereopuerto.model.enums.RolEmpleado;
 import com.example.aereopuerto.service.AsignacionService;
 import com.example.aereopuerto.controller.VueloController;
+import com.example.aereopuerto.service.CancelacionVueloService;
 import com.example.aereopuerto.service.CheckinService;
 import com.example.aereopuerto.service.PasajeService;
 import com.example.aereopuerto.service.ReservaService;
@@ -54,6 +55,9 @@ class SecurityAuthorizationTest {
 
     @MockitoBean
     private VueloService vueloService;
+
+    @MockitoBean
+    private CancelacionVueloService cancelacionVueloService;
 
     @MockitoBean
     private AuthService authService;

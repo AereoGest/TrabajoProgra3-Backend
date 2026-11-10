@@ -13,7 +13,7 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${app.frontend.url:https://aerogest.ddns.net}")
+    @Value("${app.frontend.url:https://aereogest.duckdns.org}")
     private String frontendUrl;
 
     @Async

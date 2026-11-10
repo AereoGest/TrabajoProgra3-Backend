@@ -36,6 +36,10 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ReservaService {
 
+    // Motivos que se guardan en la reserva al cancelarla (el front los traduce)
+    public static final String MOTIVO_CANCELADA_POR_CLIENTE = "Cancelada por el cliente";
+    public static final String MOTIVO_CANCELADA_POR_AEROLINEA = "Cancelada por la aerolínea";
+
     @Autowired
     private final ReservaRepository reservaRepository;
     private final PersonaRepository personaRepository;
@@ -369,6 +373,7 @@ public class ReservaService {
 
         if (reservaDTO.getEstadoReserva() == EstadoReserva.CANCELADA
                 && reserva.getEstadoReserva() != EstadoReserva.CANCELADA) {
+            registrarReembolso(reserva, MOTIVO_CANCELADA_POR_AEROLINEA);
             liberarAsientosYCancelar(reserva);
         } else {
             reserva.setEstadoReserva(reservaDTO.getEstadoReserva());
@@ -391,9 +396,20 @@ public class ReservaService {
         }
     }
 
+    /** Cancelación hecha por un admin o empleado (ej. DELETE /api/reservas/{id}). */
     @Transactional
     @CacheEvict(value = "reservas", allEntries = true)
     public void cancelarReserva(Integer id) {
+        cancelarReserva(id, MOTIVO_CANCELADA_POR_AEROLINEA);
+    }
+
+    /**
+     * Cancela la reserva, libera sus asientos y guarda en la reserva el reembolso que corresponde
+     * según la política de devolución (días hasta el vuelo) y el motivo, para que lo vean el cliente y el admin.
+     */
+    @Transactional
+    @CacheEvict(value = "reservas", allEntries = true)
+    public void cancelarReserva(Integer id, String motivo) {
 
         Reserva reserva = reservaRepository.findById(id)
                 .orElseThrow(() -> new ReservaInvalidaException("Reserva no encontrada"));
@@ -403,18 +419,11 @@ public class ReservaService {
                     "La reserva ya se encuentra cancelada");
         }
 
-        BigDecimal reembolso = politicaService.calcular(reserva);
-        if (reembolso.compareTo(BigDecimal.ZERO) == 0) {
-            System.out.println("No corresponde reembolso para la reserva ID: " + id);
-        } else if (reembolso.compareTo(reserva.getValor()) == 0) {
-            System.out.println("Reembolso total de $" + reembolso + " para la reserva ID: " + id);
-        } else {
-            System.out.println("Reembolso parcial de $" + reembolso + " para la reserva ID: " + id);
-        }
-
+        registrarReembolso(reserva, motivo);
         liberarAsientosYCancelar(reserva);
     }
 
+    @Transactional
     @CacheEvict(value = "reservas", allEntries = true)
     public void cancelarReservaPorUsuario(Integer id, User usuarioAutenticado) {
         Reserva reserva = reservaRepository.findById(id)
@@ -424,7 +433,14 @@ public class ReservaService {
         if (!esAdminOEmpleado && !reserva.getPersona().getId().equals(usuarioAutenticado.getPersona().getId())) {
             throw new ReservaInvalidaException("La reserva no pertenece al usuario autenticado.");
         }
-        cancelarReserva(id);
+        cancelarReserva(id, esAdminOEmpleado ? MOTIVO_CANCELADA_POR_AEROLINEA : MOTIVO_CANCELADA_POR_CLIENTE);
+    }
+
+    /** Calcula el reembolso con la política de devolución y lo deja registrado en la reserva junto al motivo. */
+    private void registrarReembolso(Reserva reserva, String motivo) {
+        BigDecimal reembolso = politicaService.calcular(reserva);
+        reserva.setMontoReembolso(reembolso != null ? reembolso : BigDecimal.ZERO);
+        reserva.setMotivoCancelacion(motivo);
     }
 
     private void crearFactura(Reserva reserva, PagoRequest pago, String cuil) {

@@ -54,6 +54,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.GET, "/api/vuelos",
                                                 "/api/vuelos/filtrar",
+                                                "/api/vuelos/{id}/impacto-cancelacion",
                                                 "/api/auth/usuarios",
                                                 "/api/auth/usuarios/{id}",
                                                 "/api/reservas",

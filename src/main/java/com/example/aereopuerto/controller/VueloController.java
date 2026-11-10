@@ -1,9 +1,11 @@
 package com.example.aereopuerto.controller;
 
+import com.example.aereopuerto.dto.ImpactoCancelacionDTO;
 import com.example.aereopuerto.dto.ValidacionVueloDTO;
 import com.example.aereopuerto.dto.VueloDTO;
 import com.example.aereopuerto.model.Vuelo;
 import com.example.aereopuerto.model.enums.estadoVuelo;
+import com.example.aereopuerto.service.CancelacionVueloService;
 import com.example.aereopuerto.service.VueloService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +32,7 @@ public class VueloController {
 
         @Autowired
         private final VueloService vueloService;
+        private final CancelacionVueloService cancelacionVueloService;
 
         @Operation(summary = "Obtener un vuelo por su ID", description = "Devuelve los detalles de un vuelo. Utiliza caché Redis para respuestas ultra rapidas.")
         @ApiResponses(value = {
@@ -93,7 +96,16 @@ public class VueloController {
         }
 
         @PreAuthorize("hasRole('ADMIN')")
-        @Operation(summary = "Dar de baja un vuelo", description = "Baja lógica: el vuelo pasa a estado CANCELADO y deja de mostrarse a los clientes, pero se conserva para reservas e historial.")
+        @Operation(summary = "Impacto de cancelar un vuelo", description = "Devuelve cuántas reservas y pasajeros activos tiene el vuelo y el reembolso total (100% de lo pagado) que se registraría si se cancela. No modifica nada.")
+        @ApiResponse(responseCode = "200", description = "Impacto calculado")
+        @GetMapping("/{id}/impacto-cancelacion")
+        public ResponseEntity<ImpactoCancelacionDTO> impactoCancelacion(@PathVariable Integer id) {
+                vueloService.obtenerVueloPorId(id); // 400 si el vuelo no existe
+                return ResponseEntity.ok(cancelacionVueloService.calcularImpacto(id));
+        }
+
+        @PreAuthorize("hasRole('ADMIN')")
+        @Operation(summary = "Dar de baja un vuelo", description = "Baja lógica: el vuelo pasa a estado CANCELADO y deja de mostrarse a los clientes. Sus reservas activas se cancelan, se libera cada asiento, se registra el reembolso del 100% de lo pagado y se avisa por mail a cada cliente.")
         @ApiResponses(value = {
                         @ApiResponse(responseCode = "200", description = "Vuelo dado de baja exitosamente"),
                         @ApiResponse(responseCode = "400", description = "El vuelo no existe o ya estaba cancelado")

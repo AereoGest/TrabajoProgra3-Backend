@@ -9,8 +9,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-import java.time.format.DateTimeFormatter;
-
 /**
  * Avisa por mail a los clientes cuyas reservas se cancelaron porque se canceló el vuelo.
  * Corre después de que la cancelación se guardó: si un mail falla, la cancelación ya está hecha
@@ -21,8 +19,6 @@ import java.time.format.DateTimeFormatter;
 public class NotificadorCancelacionVuelo {
 
     private static final Logger log = LoggerFactory.getLogger(NotificadorCancelacionVuelo.class);
-    private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("HH:mm");
 
     private final EmailService emailService;
 
@@ -42,21 +38,6 @@ public class NotificadorCancelacionVuelo {
 
     /** Ej.: "Buenos Aires (EZE) → Madrid (MAD) del 15/12/2026 a las 10:00". */
     static String describirVuelo(Vuelo vuelo) {
-        StringBuilder sb = new StringBuilder();
-        if (vuelo.getAeropuertoOrigen() != null && vuelo.getAeropuertoDestino() != null) {
-            sb.append(vuelo.getAeropuertoOrigen().getCiudad())
-                    .append(" (").append(vuelo.getAeropuertoOrigen().getCodigoIata()).append(") → ")
-                    .append(vuelo.getAeropuertoDestino().getCiudad())
-                    .append(" (").append(vuelo.getAeropuertoDestino().getCodigoIata()).append(")");
-        } else {
-            sb.append("#").append(vuelo.getId());
-        }
-        if (vuelo.getFechaSalida() != null) {
-            sb.append(" del ").append(vuelo.getFechaSalida().format(FECHA));
-        }
-        if (vuelo.getHoraSalida() != null) {
-            sb.append(" a las ").append(vuelo.getHoraSalida().format(HORA));
-        }
-        return sb.toString();
+        return DescripcionVuelo.de(vuelo);
     }
 }

@@ -10,6 +10,7 @@ import com.example.aereopuerto.auth.repository.UserRepository;
 import com.example.aereopuerto.auth.service.UsuarioAutenticadoService;
 import com.example.aereopuerto.dto.*;
 import com.example.aereopuerto.model.*;
+import com.example.aereopuerto.model.enums.ClasesVuelo;
 import com.example.aereopuerto.model.enums.EstadoReserva;
 import com.example.aereopuerto.model.enums.MetodosDePago;
 import com.example.aereopuerto.model.enums.estadoVuelo;
@@ -22,6 +23,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
@@ -56,6 +58,7 @@ public class ReservaService {
     private final CarritoRepository carritoRepository;
     private final CarritoService carritoService;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${tarifas.impuesto}")
     private BigDecimal tasaImpuesto;
@@ -238,9 +241,11 @@ public class ReservaService {
             case "approved" -> {
                 reserva.setEstadoReserva(EstadoReserva.CONFIRMADO);
                 reservaRepository.save(reserva);
-                crearFactura(reserva, pago, cuil);
+                Factura factura = crearFactura(reserva, pago, cuil);
                 Integer personaId = reserva.getPersona().getId();
                 carritoService.clearCarrito(personaId, carritoService.getCarritoByPersonaId(personaId).getId());
+                // El recibo sale recién cuando se confirma la transacción
+                eventPublisher.publishEvent(armarRecibo(reserva, factura, usuarioAutenticado.getEmail()));
             }
             case "rejected" -> liberarAsientosYCancelar(reserva);
             default -> reservaRepository.save(reserva); // in_process / pending: queda PROCESANDO
@@ -443,7 +448,7 @@ public class ReservaService {
         reserva.setMotivoCancelacion(motivo);
     }
 
-    private void crearFactura(Reserva reserva, PagoRequest pago, String cuil) {
+    private Factura crearFactura(Reserva reserva, PagoRequest pago, String cuil) {
         Factura factura = Factura.builder()
                 .reserva(reserva)
                 .CUIL(cuil)
@@ -454,6 +459,53 @@ public class ReservaService {
                 .totalPagado(reserva.getValor().doubleValue())
                 .build();
         facturaRepository.save(factura);
+        return factura;
+    }
+
+    /** Arma los datos del recibo de compra mientras la reserva y sus pasajes siguen cargados. */
+    private CompraConfirmadaEvent armarRecibo(Reserva reserva, Factura factura, String email) {
+        List<Pasaje> pasajes = reserva.getPasajes() != null ? reserva.getPasajes() : List.of();
+        String descripcionVuelo = pasajes.stream()
+                .map(Pasaje::getVuelo)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .map(DescripcionVuelo::de)
+                .orElse(null);
+        List<CompraConfirmadaEvent.Pasajero> pasajeros = pasajes.stream()
+                .map(p -> new CompraConfirmadaEvent.Pasajero(
+                        (p.getNombre() + " " + p.getApellido()).trim(),
+                        describirClase(p.getClasesVuelo()),
+                        p.getAsiento() != null ? p.getAsiento().getCodigo() : null))
+                .toList();
+        return new CompraConfirmadaEvent(
+                email,
+                reserva.getPersona() != null ? reserva.getPersona().getNombre() : null,
+                reserva.getCodigoReserva(),
+                descripcionVuelo,
+                pasajeros,
+                reserva.getValor(),
+                factura.getCuotas(),
+                describirMedioDePago(factura.getMetodoDePago()));
+    }
+
+    private static String describirClase(ClasesVuelo clase) {
+        if (clase == null) return null;
+        return switch (clase) {
+            case TURISTA -> "Turista";
+            case ECONOMICA -> "Económica";
+            case BUSINESS -> "Business";
+            case PRIMERA -> "Primera";
+        };
+    }
+
+    private static String describirMedioDePago(MetodosDePago metodo) {
+        if (metodo == null) return null;
+        return switch (metodo) {
+            case TARJETA_CREDITO -> "Tarjeta de crédito";
+            case TARJETA_DEBITO -> "Tarjeta de débito";
+            case TRANSFERENCIA -> "Transferencia";
+            case MERCADOPAGO -> "Mercado Pago";
+        };
     }
 
     private static final Map<String, MetodosDePago> METODOS_DE_PAGO = Map.of(

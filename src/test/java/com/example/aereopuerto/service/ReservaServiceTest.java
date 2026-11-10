@@ -22,7 +22,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
+import com.example.aereopuerto.dto.CarritoDTO;
+import com.example.aereopuerto.dto.PagoRequest;
+import com.example.aereopuerto.dto.PagoResponse;
+
+import java.time.LocalTime;
+import java.util.Map;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -70,6 +78,8 @@ class ReservaServiceTest {
     private CarritoService carritoService;
     @Mock
     private UsuarioAutenticadoService usuarioAutenticadoService;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ReservaService reservaService;
@@ -351,6 +361,93 @@ class ReservaServiceTest {
         assertThat(reserva.getEstadoReserva()).isEqualTo(EstadoReserva.CANCELADA);
         assertThat(reserva.getMontoReembolso()).isEqualByComparingTo("30000");
         assertThat(reserva.getMotivoCancelacion()).isEqualTo(ReservaService.MOTIVO_CANCELADA_POR_CLIENTE);
+    }
+
+    private Reserva reservaPendienteDePago() {
+        vuelo.setAeropuertoOrigen(Aeropuerto.builder().ciudad("Buenos Aires").codigoIata("EZE").build());
+        vuelo.setAeropuertoDestino(Aeropuerto.builder().ciudad("Madrid").codigoIata("MAD").build());
+        vuelo.setFechaSalida(LocalDate.of(2026, 12, 15));
+        vuelo.setHoraSalida(LocalTime.of(10, 5));
+        Reserva reserva = Reserva.builder()
+                .id(70)
+                .codigoReserva("AC-2026-PAGO")
+                .persona(cliente)
+                .estadoReserva(EstadoReserva.PROCESANDO)
+                .valor(new BigDecimal("150000"))
+                .pasajes(new ArrayList<>())
+                .build();
+        reserva.agregarPasaje(Pasaje.builder()
+                .nombre("Juan").apellido("Pérez")
+                .clasesVuelo(ClasesVuelo.ECONOMICA)
+                .vuelo(vuelo)
+                .asiento(Asiento.builder().codigo("12A").build())
+                .build());
+        reserva.agregarPasaje(Pasaje.builder()
+                .nombre("Ana").apellido("Gómez")
+                .clasesVuelo(ClasesVuelo.ECONOMICA)
+                .vuelo(vuelo)
+                .build());
+        return reserva;
+    }
+
+    private PagoRequest pagoConVisa() {
+        PagoRequest pago = new PagoRequest();
+        pago.setToken("tok");
+        pago.setInstallments(3);
+        pago.setPaymentMethodId("visa");
+        pago.setPayerEmail("pagador@mail.com");
+        pago.setPayerDocType("DNI");
+        pago.setPayerDocNumber("35123456");
+        pago.setCuil("20-35123456-7");
+        pago.setSituacionFiscal("Consumidor final");
+        return pago;
+    }
+
+    @Test
+    @DisplayName("Si el pago se aprueba, publica el recibo con el mail de la cuenta y los datos de la compra")
+    void pagarReserva_aprobado_publicaRecibo() {
+        Reserva reserva = reservaPendienteDePago();
+        User titular = User.builder().id(1).email("juan@aerogest.com").persona(cliente).build();
+        CarritoDTO carrito = new CarritoDTO();
+        carrito.setId(3);
+
+        when(reservaRepository.findById(70)).thenReturn(Optional.of(reserva));
+        when(mercadoPagoService.procesarPago(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Map.of("status", "approved", "id", 999L));
+        when(carritoService.getCarritoByPersonaId(10)).thenReturn(carrito);
+
+        PagoResponse respuesta = reservaService.pagarReserva(70, pagoConVisa(), titular);
+
+        assertThat(respuesta.estadoReserva()).isEqualTo(EstadoReserva.CONFIRMADO);
+        ArgumentCaptor<CompraConfirmadaEvent> captor = ArgumentCaptor.forClass(CompraConfirmadaEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        CompraConfirmadaEvent recibo = captor.getValue();
+        assertThat(recibo.email()).isEqualTo("juan@aerogest.com");
+        assertThat(recibo.nombre()).isEqualTo("Juan");
+        assertThat(recibo.codigoReserva()).isEqualTo("AC-2026-PAGO");
+        assertThat(recibo.descripcionVuelo()).isEqualTo("Buenos Aires (EZE) → Madrid (MAD) del 15/12/2026 a las 10:05");
+        assertThat(recibo.pasajeros()).containsExactly(
+                new CompraConfirmadaEvent.Pasajero("Juan Pérez", "Económica", "12A"),
+                new CompraConfirmadaEvent.Pasajero("Ana Gómez", "Económica", null));
+        assertThat(recibo.total()).isEqualByComparingTo("150000");
+        assertThat(recibo.cuotas()).isEqualTo(3);
+        assertThat(recibo.medioDePago()).isEqualTo("Tarjeta de crédito");
+    }
+
+    @Test
+    @DisplayName("Si el pago se rechaza, no se manda recibo")
+    void pagarReserva_rechazado_noPublicaRecibo() {
+        Reserva reserva = reservaPendienteDePago();
+        User titular = User.builder().id(1).email("juan@aerogest.com").persona(cliente).build();
+
+        when(reservaRepository.findById(70)).thenReturn(Optional.of(reserva));
+        when(mercadoPagoService.procesarPago(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Map.of("status", "rejected", "id", 999L));
+
+        reservaService.pagarReserva(70, pagoConVisa(), titular);
+
+        assertThat(reserva.getEstadoReserva()).isEqualTo(EstadoReserva.CANCELADA);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test

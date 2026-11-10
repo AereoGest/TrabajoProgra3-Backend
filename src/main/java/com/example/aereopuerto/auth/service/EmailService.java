@@ -1,5 +1,6 @@
 package com.example.aereopuerto.auth.service;
 
+import com.example.aereopuerto.service.CompraConfirmadaEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
@@ -79,8 +80,7 @@ public class EmailService {
         message.setTo(toEmail);
         message.setSubject("Tu vuelo fue cancelado - Reserva " + codigoReserva);
 
-        String saludo = (nombre == null || nombre.isBlank() || "Pendiente".equals(nombre))
-                ? "Hola,\n\n" : "Hola " + nombre + ",\n\n";
+        String saludo = saludo(nombre);
 
         String reembolso = montoReembolso != null && montoReembolso.signum() > 0
                 ? "Vamos a reintegrarte el 100% de lo abonado: " + formatearMonto(montoReembolso) + ".\n\n"
@@ -95,6 +95,55 @@ public class EmailService {
                 "Saludos,\nEl equipo de AeroGest");
 
         mailSender.send(message);
+    }
+
+    /** Recibo que se le manda al cliente cuando se aprueba el pago de su reserva. */
+    @Async
+    public void sendReciboCompraEmail(CompraConfirmadaEvent recibo) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(recibo.email());
+        message.setSubject("Recibo de tu compra - Reserva " + recibo.codigoReserva());
+        message.setText(armarTextoRecibo(recibo));
+        mailSender.send(message);
+    }
+
+    String armarTextoRecibo(CompraConfirmadaEvent recibo) {
+        StringBuilder sb = new StringBuilder(saludo(recibo.nombre()));
+        sb.append("¡Gracias por tu compra! Tu pago fue aprobado y tu reserva quedó confirmada.\n\n");
+        sb.append("Reserva: ").append(recibo.codigoReserva()).append("\n");
+        if (recibo.descripcionVuelo() != null) {
+            sb.append("Vuelo: ").append(recibo.descripcionVuelo()).append("\n");
+        }
+
+        if (recibo.pasajeros() != null && !recibo.pasajeros().isEmpty()) {
+            sb.append("\nPasajeros:\n");
+            for (CompraConfirmadaEvent.Pasajero p : recibo.pasajeros()) {
+                sb.append("  - ").append(p.nombreCompleto());
+                if (p.clase() != null) sb.append(" · ").append(p.clase());
+                sb.append(" · ").append(p.asiento() != null ? "Asiento " + p.asiento() : "Asiento a asignar en el check-in");
+                sb.append("\n");
+            }
+        }
+
+        sb.append("\nTotal pagado: ").append(recibo.total() != null ? formatearMonto(recibo.total()) : "-").append("\n");
+        if (recibo.medioDePago() != null) {
+            sb.append("Medio de pago: ").append(recibo.medioDePago());
+            if (recibo.cuotas() != null && recibo.cuotas() > 1) {
+                sb.append(" en ").append(recibo.cuotas()).append(" cuotas");
+            }
+            sb.append("\n");
+        }
+
+        sb.append("\nPodés ver el detalle y descargar tu factura en Mis reservas: ")
+                .append(frontendUrl).append("/reservas\n\n")
+                .append("¡Buen viaje!\n\n")
+                .append("Saludos,\nEl equipo de AeroGest");
+        return sb.toString();
+    }
+
+    private static String saludo(String nombre) {
+        return (nombre == null || nombre.isBlank() || "Pendiente".equals(nombre))
+                ? "Hola,\n\n" : "Hola " + nombre + ",\n\n";
     }
 
     private static String formatearMonto(BigDecimal monto) {

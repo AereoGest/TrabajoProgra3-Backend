@@ -70,6 +70,7 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 HttpMethod.POST, "/api/vuelos",
+                                                "/api/vuelos/validar",
                                                 "/api/reservas",
                                                 "/api/pasajes",
                                                 "/api/equipajes",

@@ -22,6 +22,7 @@ public interface VueloRepository extends JpaRepository<Vuelo, Integer>, JpaSpeci
     SELECT COUNT(v) > 0 FROM Vuelo v
     WHERE v.avion.id = :avionId
     AND v.id <> :excludeId
+    AND v.estado <> com.example.aereopuerto.model.enums.estadoVuelo.CANCELADO
     AND (
         FUNCTION('TIMESTAMP', v.fechaSalida, v.horaSalida) < FUNCTION('TIMESTAMP', :fechaLlegada, :horaLlegada)
         AND

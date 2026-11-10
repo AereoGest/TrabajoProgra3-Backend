@@ -1,5 +1,6 @@
 package com.example.aereopuerto.controller;
 
+import com.example.aereopuerto.dto.ValidacionVueloDTO;
 import com.example.aereopuerto.dto.VueloDTO;
 import com.example.aereopuerto.model.Vuelo;
 import com.example.aereopuerto.model.enums.estadoVuelo;
@@ -57,13 +58,26 @@ public class VueloController {
         }
 
         @PreAuthorize("hasRole('ADMIN')")
-        @Operation(summary = "Crear un nuevo vuelo", description = "Crea un vuelo en MySQL y actualiza automáticamente la caché de Redis.")
-        @ApiResponse(responseCode = "201", description = "Vuelo creado exitosamente")
+        @Operation(summary = "Crear un nuevo vuelo", description = "Da de alta un vuelo a partir de los IDs de aeropuertos y avión. Si no se indica estado, se crea como PROGRAMADO.")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "201", description = "Vuelo creado exitosamente"),
+                        @ApiResponse(responseCode = "400", description = "Datos del vuelo inválidos o avión no disponible"),
+                        @ApiResponse(responseCode = "404", description = "Aeropuerto o avión no encontrado")
+        })
         @PostMapping
-        public ResponseEntity<Vuelo> crearVuelo(@RequestBody Vuelo vuelo) {
-                vueloService.invalidarListaDeVuelos();
+        public ResponseEntity<Vuelo> crearVuelo(@RequestBody VueloDTO vuelo) {
                 Vuelo nuevoVuelo = vueloService.crearVuelo(vuelo);
                 return ResponseEntity.status(HttpStatus.CREATED).body(nuevoVuelo);
+        }
+
+        @PreAuthorize("hasRole('ADMIN')")
+        @Operation(summary = "Validar un vuelo sin guardarlo", description = "Ejecuta las mismas validaciones del alta (sin vueloId) o de la modificación (con vueloId) y devuelve el primer error encontrado. Lo usa el panel de admin para avisar errores mientras se completa el formulario.")
+        @ApiResponse(responseCode = "200", description = "Resultado de la validación (valido=true/false y mensaje)")
+        @PostMapping("/validar")
+        public ResponseEntity<ValidacionVueloDTO> validarVuelo(
+                        @Parameter(description = "ID del vuelo que se está modificando. Vacío si es un alta.") @RequestParam(required = false) Integer vueloId,
+                        @RequestBody VueloDTO vuelo) {
+                return ResponseEntity.ok(vueloService.validarVuelo(vueloId, vuelo));
         }
 
         @PreAuthorize("hasRole('ADMIN')")
@@ -79,13 +93,14 @@ public class VueloController {
         }
 
         @PreAuthorize("hasRole('ADMIN')")
-        @Operation(summary = "Eliminar un vuelo", description = "Borra el vuelo de la base de datos e invalida su entrada en la cache Redis.")
-        @ApiResponse(responseCode = "204", description = "Vuelo eliminado exitosamente")
+        @Operation(summary = "Dar de baja un vuelo", description = "Baja lógica: el vuelo pasa a estado CANCELADO y deja de mostrarse a los clientes, pero se conserva para reservas e historial.")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Vuelo dado de baja exitosamente"),
+                        @ApiResponse(responseCode = "400", description = "El vuelo no existe o ya estaba cancelado")
+        })
         @DeleteMapping("/{id}")
-        public ResponseEntity<Void> eliminarVuelo(@PathVariable Integer id) {
-                vueloService.invalidarListaDeVuelos();
-                vueloService.eliminarVuelo(id);
-                return ResponseEntity.noContent().build();
+        public ResponseEntity<Vuelo> darDeBajaVuelo(@PathVariable Integer id) {
+                return ResponseEntity.ok(vueloService.darDeBajaVuelo(id));
         }
 
         @Operation(summary = "Filtrar vuelos disponibles", description = "Filtra el listado de vuelos disponibles según los criterios indicados. Todos los parámetros son opcionales y se combinan entre sí.")

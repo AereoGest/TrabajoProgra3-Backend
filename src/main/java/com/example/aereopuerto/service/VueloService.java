@@ -4,6 +4,7 @@ import com.example.aereopuerto.Exceptions.AeropuertoInvalidoException;
 import com.example.aereopuerto.Exceptions.AvionInvalidoException;
 import com.example.aereopuerto.Exceptions.VueloInvalidoException;
 import com.example.aereopuerto.Specifications.VueloSpecification;
+import com.example.aereopuerto.dto.ValidacionVueloDTO;
 import com.example.aereopuerto.dto.VueloDTO;
 import com.example.aereopuerto.model.Aeropuerto;
 import com.example.aereopuerto.model.Avion;
@@ -23,12 +24,14 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.text.Normalizer;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -52,20 +55,9 @@ public class VueloService {
             @CacheEvict(value = "vuelos", key = "'todos'"),
             @CacheEvict(value = "vuelos", key = "'disponibles'")
     })
-    public Vuelo crearVuelo(Vuelo vuelo) {
-        validarAvionDisponible(vuelo.getAvion().getId());
-        validarDisponibilidadAvion(
-                vuelo.getAvion().getId(),
-                vuelo.getFechaSalida(),
-                vuelo.getFechaLlegada(),
-                vuelo.getHoraSalida(),
-                vuelo.getHoraLlegada(),
-                -1);
-
-        validarDatosVuelo(vuelo);
-        validarCiudad(vuelo.getAeropuertoOrigen().getCiudad(), "origen");
-        validarCiudad(vuelo.getAeropuertoDestino().getCiudad(), "destino");
-
+    public Vuelo crearVuelo(VueloDTO vueloDTO) {
+        Vuelo vuelo = new Vuelo();
+        prepararAlta(vuelo, vueloDTO);
         return vueloRepository.save(vuelo);
     }
 
@@ -74,10 +66,127 @@ public class VueloService {
             @CacheEvict(value = "vuelos", key = "'disponibles'")
     })
     public Vuelo actualizarVuelo(Integer id, VueloDTO vueloDTO) {
+        Vuelo vuelo = buscarVuelo(id);
+        validarNoFinalizado(vuelo, "modificar");
+        prepararModificacion(vuelo, vueloDTO);
+        return vueloRepository.save(vuelo);
+    }
 
-        Vuelo vuelo = vueloRepository.findById(id)
+    /**
+     * Corre las mismas validaciones que el alta (vueloId == null) o la modificación,
+     * pero sin guardar nada. El panel de admin lo usa para avisar los errores en vivo
+     * (por ejemplo, que el avión ya tiene un vuelo en ese horario).
+     */
+    public ValidacionVueloDTO validarVuelo(Integer vueloId, VueloDTO vueloDTO) {
+        try {
+            // Se trabaja sobre un borrador para no modificar la entidad gestionada por JPA
+            Vuelo borrador = new Vuelo();
+            if (vueloId == null) {
+                prepararAlta(borrador, vueloDTO);
+            } else {
+                validarNoFinalizado(buscarVuelo(vueloId), "modificar");
+                borrador.setId(vueloId);
+                prepararModificacion(borrador, vueloDTO);
+            }
+            return ValidacionVueloDTO.ok();
+        } catch (VueloInvalidoException | AvionInvalidoException | AeropuertoInvalidoException e) {
+            return ValidacionVueloDTO.error(e.getMessage());
+        }
+    }
+
+    private void prepararAlta(Vuelo vuelo, VueloDTO vueloDTO) {
+        validarCamposObligatorios(vueloDTO);
+
+        estadoVuelo estado = vueloDTO.getEstado() != null ? vueloDTO.getEstado() : estadoVuelo.PROGRAMADO;
+        if (estado == estadoVuelo.CANCELADO) {
+            throw new VueloInvalidoException("No se puede dar de alta un vuelo en estado CANCELADO.");
+        }
+
+        LocalDateTime salida = LocalDateTime.of(vueloDTO.getFechaSalida(), vueloDTO.getHoraSalida());
+        if (!salida.isAfter(LocalDateTime.now())) {
+            throw new VueloInvalidoException("La fecha y hora de salida debe ser posterior al momento actual.");
+        }
+
+        cargarDatosVuelo(vuelo, vueloDTO);
+        vuelo.setEstado(estado);
+
+        validarDatosVuelo(vuelo);
+        validarAvionDisponible(vuelo.getAvion().getId());
+        validarDisponibilidadAvion(
+                vuelo.getAvion().getId(),
+                vuelo.getFechaSalida(),
+                vuelo.getFechaLlegada(),
+                vuelo.getHoraSalida(),
+                vuelo.getHoraLlegada(),
+                -1);
+    }
+
+    private void prepararModificacion(Vuelo vuelo, VueloDTO vueloDTO) {
+        validarCamposObligatorios(vueloDTO);
+        if (vueloDTO.getEstado() == null) {
+            throw new VueloInvalidoException("El estado del vuelo es obligatorio.");
+        }
+
+        cargarDatosVuelo(vuelo, vueloDTO);
+        vuelo.setEstado(vueloDTO.getEstado());
+
+        validarDatosVuelo(vuelo);
+
+        // Un vuelo cancelado no ocupa el avión, así que solo se valida si sigue operativo
+        if (vuelo.getEstado() != estadoVuelo.CANCELADO) {
+            validarAvionDisponible(vuelo.getAvion().getId());
+            validarDisponibilidadAvion(
+                    vuelo.getAvion().getId(),
+                    vuelo.getFechaSalida(),
+                    vuelo.getFechaLlegada(),
+                    vuelo.getHoraSalida(),
+                    vuelo.getHoraLlegada(),
+                    vuelo.getId());
+        }
+    }
+
+    private Vuelo buscarVuelo(Integer id) {
+        return vueloRepository.findById(id)
                 .orElseThrow(() -> new VueloInvalidoException("Vuelo no encontrado. ID: " + id));
+    }
 
+    /** Un vuelo cuya fecha y hora de llegada ya pasó se considera finalizado. */
+    public static boolean estaFinalizado(Vuelo vuelo) {
+        if (vuelo.getFechaLlegada() == null || vuelo.getHoraLlegada() == null) {
+            return false;
+        }
+        return LocalDateTime.of(vuelo.getFechaLlegada(), vuelo.getHoraLlegada()).isBefore(LocalDateTime.now());
+    }
+
+    private void validarNoFinalizado(Vuelo vuelo, String accion) {
+        if (estaFinalizado(vuelo)) {
+            throw new VueloInvalidoException(
+                    "No se puede " + accion + " el vuelo #" + vuelo.getId() + " porque ya finalizó.");
+        }
+    }
+
+    private void validarCamposObligatorios(VueloDTO dto) {
+        if (dto == null) {
+            throw new VueloInvalidoException("Los datos del vuelo son obligatorios.");
+        }
+        if (dto.getAeropuertoOrigenId() == null || dto.getAeropuertoDestinoId() == null) {
+            throw new VueloInvalidoException("El aeropuerto de origen y destino son obligatorios.");
+        }
+        if (dto.getAvionId() == null) {
+            throw new VueloInvalidoException("El avión es obligatorio.");
+        }
+        if (dto.getFechaSalida() == null || dto.getFechaLlegada() == null) {
+            throw new VueloInvalidoException("La fecha de salida y llegada son obligatorias.");
+        }
+        if (dto.getHoraSalida() == null || dto.getHoraLlegada() == null) {
+            throw new VueloInvalidoException("La hora de salida y llegada son obligatorias.");
+        }
+        if (dto.getEscala() == null) {
+            throw new VueloInvalidoException("Indicá si el vuelo es directo o con escala.");
+        }
+    }
+
+    private void cargarDatosVuelo(Vuelo vuelo, VueloDTO vueloDTO) {
         Aeropuerto origen = aeropuertoRepository.findById(vueloDTO.getAeropuertoOrigenId())
                 .orElseThrow(() -> new AeropuertoInvalidoException(
                         "Aeropuerto origen no encontrado. ID: " + vueloDTO.getAeropuertoOrigenId()));
@@ -90,8 +199,6 @@ public class VueloService {
                 .orElseThrow(() -> new AvionInvalidoException(
                         "Avión no encontrado. ID: " + vueloDTO.getAvionId()));
 
-        validarAvionDisponible(avion.getId());
-
         vuelo.setAeropuertoOrigen(origen);
         vuelo.setAeropuertoDestino(destino);
         vuelo.setAvion(avion);
@@ -99,24 +206,8 @@ public class VueloService {
         vuelo.setFechaLlegada(vueloDTO.getFechaLlegada());
         vuelo.setHoraSalida(vueloDTO.getHoraSalida());
         vuelo.setHoraLlegada(vueloDTO.getHoraLlegada());
-        vuelo.setEstado(vueloDTO.getEstado());
         vuelo.setPrecioVuelo(vueloDTO.getPrecioVuelo());
         vuelo.setEscala(vueloDTO.getEscala());
-
-        validarDisponibilidadAvion(
-                vueloDTO.getAvionId(),
-                vueloDTO.getFechaSalida(),
-                vueloDTO.getFechaLlegada(), // agregás este
-                vueloDTO.getHoraSalida(),
-                vueloDTO.getHoraLlegada(),
-                id);
-
-        validarDatosVuelo(vuelo);
-
-        validarCiudad(vuelo.getAeropuertoOrigen().getCiudad(), "origen");
-        validarCiudad(vuelo.getAeropuertoDestino().getCiudad(), "destino");
-
-        return vueloRepository.save(vuelo);
     }
 
     private void validarDatosVuelo(Vuelo vuelo) {
@@ -131,6 +222,15 @@ public class VueloService {
 
             throw new VueloInvalidoException(
                     "El aeropuerto de origen y destino deben ser distintos.");
+        }
+
+        // Ej.: EZE y AEP son aeropuertos distintos pero ambos están en Buenos Aires
+        String ciudadOrigen = normalizarCiudad(vuelo.getAeropuertoOrigen().getCiudad());
+        if (!ciudadOrigen.isEmpty()
+                && ciudadOrigen.equals(normalizarCiudad(vuelo.getAeropuertoDestino().getCiudad()))) {
+            throw new VueloInvalidoException(
+                    "El origen y el destino no pueden estar en la misma ciudad ("
+                            + vuelo.getAeropuertoOrigen().getCiudad() + ").");
         }
 
         if (vuelo.getHoraSalida() == null || vuelo.getHoraLlegada() == null) {
@@ -166,8 +266,17 @@ public class VueloService {
 
         if (Boolean.TRUE.equals(vuelo.getEscala()) && horasDuracion > 36) {
             throw new VueloInvalidoException(
-                    "La duracion total del vuelo no puede exceder las 40 horas.");
+                    "La duración total de un vuelo con escala no puede exceder las 36 horas.");
         }
+    }
+
+    private static String normalizarCiudad(String ciudad) {
+        if (ciudad == null) return "";
+        return Normalizer.normalize(ciudad, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .trim()
+                .replaceAll("\\s+", " ")
+                .toLowerCase(Locale.ROOT);
     }
 
     private void validarAvionDisponible(Integer avionId) {
@@ -215,9 +324,17 @@ public class VueloService {
             @CacheEvict(value = "vuelos", key = "'todos'"),
             @CacheEvict(value = "vuelos", key = "'disponibles'")
     })
-    public void eliminarVuelo(Integer id) {
-        System.out.println("Eliminando vuelo " + id);
-        vueloRepository.deleteById(id);
+    public Vuelo darDeBajaVuelo(Integer id) {
+        Vuelo vuelo = buscarVuelo(id);
+
+        if (vuelo.getEstado() == estadoVuelo.CANCELADO) {
+            throw new VueloInvalidoException("El vuelo ya se encuentra dado de baja (CANCELADO).");
+        }
+        validarNoFinalizado(vuelo, "dar de baja");
+
+        // Baja lógica: el vuelo queda registrado (reservas, pasajes e historial lo referencian)
+        vuelo.setEstado(estadoVuelo.CANCELADO);
+        return vueloRepository.save(vuelo);
     }
 
     @Cacheable(value = "vuelos", key = "'todos'")

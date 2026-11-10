@@ -70,6 +70,7 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 HttpMethod.POST, "/api/vuelos",
+                                                "/api/aviones",
                                                 "/api/vuelos/validar",
                                                 "/api/reservas",
                                                 "/api/pasajes",
@@ -80,6 +81,7 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 HttpMethod.PUT, "/api/vuelos/{id}",
+                                                "/api/aviones/{id}",
                                                 "/api/reservas/{id}",
                                                 "/api/personas/{id}",
                                                 "/api/facturas/{id}",
@@ -94,6 +96,7 @@ public class SecurityConfig {
                                                   "/api/asistenciasAlViajero/{id}",
                                                   "/api/equipajes/{id}",
                                                   "/api/vuelos/{id}",
+                                                  "/api/aviones/{id}",
                                                   "/api/personas/{id}",
                                                   "/api/facturas/{id}",
                                                   "/api/pasajes/{id}",

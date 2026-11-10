@@ -7,4 +7,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface AvionRepository extends JpaRepository<Avion, Integer>, JpaSpecificationExecutor<Avion> {
+
+    boolean existsByIdentificadorIgnoreCase(String identificador);
+
+    boolean existsByIdentificadorIgnoreCaseAndIdNot(String identificador, Integer id);
 }

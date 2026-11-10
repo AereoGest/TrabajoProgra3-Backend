@@ -47,7 +47,7 @@ public class GlobalExceptions {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> malformedJson(HttpMessageNotReadableException ex, HttpServletRequest request) {
-        return build(HttpStatus.BAD_REQUEST, "Formato de JSON invÃ¡lido: " + ex.getMessage(), request);
+        return build(HttpStatus.BAD_REQUEST, "Formato de JSON inválido: " + ex.getMessage(), request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -55,18 +55,18 @@ public class GlobalExceptions {
         String msg = ex.getBindingResult().getFieldErrors().stream()
                 .map(e -> e.getField() + ": " + e.getDefaultMessage())
                 .reduce((a, b) -> a + "; " + b)
-                .orElse("Error de validaciÃ³n");
+                .orElse("Error de validación");
         return build(HttpStatus.BAD_REQUEST, msg, request);
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> missingParam(MissingServletRequestParameterException ex, HttpServletRequest request) {
-        return build(HttpStatus.BAD_REQUEST, "Falta el parÃ¡metro: " + ex.getParameterName(), request);
+        return build(HttpStatus.BAD_REQUEST, "Falta el parámetro: " + ex.getParameterName(), request);
     }
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ErrorResponse> badCredentials(BadCredentialsException ex, HttpServletRequest request) {
-        return build(HttpStatus.UNAUTHORIZED, "Email o contraseÃ±a incorrectos", request);
+        return build(HttpStatus.UNAUTHORIZED, "Email o contraseña incorrectos", request);
     }
 
     @ExceptionHandler(DisabledException.class)
@@ -86,7 +86,7 @@ public class GlobalExceptions {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> forbidden(AccessDeniedException ex, HttpServletRequest request) {
-        return build(HttpStatus.FORBIDDEN, "No tenÃ©s permisos para acceder a este recurso", request);
+        return build(HttpStatus.FORBIDDEN, "No tenés permisos para acceder a este recurso", request);
     }
 
     @ExceptionHandler({
@@ -104,7 +104,7 @@ public class GlobalExceptions {
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> methodNotAllowed(HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
-        return build(HttpStatus.METHOD_NOT_ALLOWED, "MÃ©todo no permitido: " + ex.getMethod(), request);
+        return build(HttpStatus.METHOD_NOT_ALLOWED, "Método no permitido: " + ex.getMethod(), request);
     }
 
     @ExceptionHandler(PagoException.class)

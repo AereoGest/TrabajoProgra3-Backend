@@ -16,6 +16,7 @@ import com.example.aereopuerto.model.enums.estadoVuelo;
 import com.example.aereopuerto.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
@@ -32,6 +33,7 @@ import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReservaService {
@@ -235,8 +237,12 @@ public class ReservaService {
                 reserva.setEstadoReserva(EstadoReserva.CONFIRMADO);
                 reservaRepository.save(reserva);
                 crearFactura(reserva, pago, cuil);
-                Integer personaId = reserva.getPersona().getId();
-                carritoService.clearCarrito(personaId, carritoService.getCarritoByPersonaId(personaId).getId());
+                try {
+                    Integer personaId = reserva.getPersona().getId();
+                    carritoService.clearCarrito(personaId, carritoService.getCarritoByPersonaId(personaId).getId());
+                } catch (Exception e) {
+                    log.warn("No se pudo vaciar el carrito para el usuario {}: {}", reserva.getPersona().getId(), e.getMessage());
+                }
             }
             case "rejected" -> liberarAsientosYCancelar(reserva);
             default -> reservaRepository.save(reserva); // in_process / pending: queda PROCESANDO

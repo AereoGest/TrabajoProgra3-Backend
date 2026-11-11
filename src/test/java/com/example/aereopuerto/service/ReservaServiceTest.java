@@ -1,10 +1,14 @@
 package com.example.aereopuerto.service;
 
+import com.example.aereopuerto.Exceptions.PagoException;
 import com.example.aereopuerto.Exceptions.PersonaInvalidaException;
 import com.example.aereopuerto.Exceptions.ReservaInvalidaException;
 import com.example.aereopuerto.auth.entity.User;
 import com.example.aereopuerto.auth.repository.UserRepository;
 import com.example.aereopuerto.auth.service.UsuarioAutenticadoService;
+import com.example.aereopuerto.dto.CarritoDTO;
+import com.example.aereopuerto.dto.PagoRequest;
+import com.example.aereopuerto.dto.PagoResponse;
 import com.example.aereopuerto.dto.PasajeRequest;
 import com.example.aereopuerto.dto.ReservaDTO;
 import com.example.aereopuerto.dto.ReservaRequest;
@@ -339,5 +343,128 @@ class ReservaServiceTest {
         assertThatThrownBy(() -> reservaService.cancelarReserva(60))
                 .isInstanceOf(ReservaInvalidaException.class)
                 .hasMessageContaining("ya se encuentra cancelada");
+    }
+
+    @Test
+    @DisplayName("pagarReserva con pago aprobado confirma la reserva, crea factura y limpia carrito")
+    void pagarReserva_PagoAprobado_ConfirmaReservaYCreaFactura() {
+        User usuario = User.builder().id(1).persona(cliente).build();
+
+        Reserva reserva = Reserva.builder()
+                .id(70)
+                .codigoReserva("AC-PAGO-001")
+                .persona(cliente)
+                .estadoReserva(EstadoReserva.PROCESANDO)
+                .valor(new BigDecimal("125000.00"))
+                .cantidadPasajes(1)
+                .pasajes(new ArrayList<>())
+                .build();
+
+        PagoRequest pago = new PagoRequest();
+        pago.setToken("tok_123456");
+        pago.setInstallments(1);
+        pago.setPaymentMethodId("visa");
+        pago.setPayerEmail("juan@aerogest.com");
+        pago.setPayerDocType("DNI");
+        pago.setPayerDocNumber("35123456");
+        pago.setCuil("20351234561");
+        pago.setSituacionFiscal("Consumidor Final");
+
+        when(reservaRepository.findById(70)).thenReturn(Optional.of(reserva));
+        when(mercadoPagoService.procesarPago(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(java.util.Map.of("status", "approved", "status_detail", "accredited", "id", 999888777L));
+
+        CarritoDTO carritoDTO = new CarritoDTO();
+        carritoDTO.setId(10);
+        when(carritoService.getCarritoByPersonaId(10)).thenReturn(carritoDTO);
+
+        PagoResponse response = reservaService.pagarReserva(70, pago, usuario);
+
+        assertThat(response.status()).isEqualTo("approved");
+        assertThat(response.estadoReserva()).isEqualTo(EstadoReserva.CONFIRMADO);
+        assertThat(reserva.getEstadoReserva()).isEqualTo(EstadoReserva.CONFIRMADO);
+        assertThat(reserva.getMercadoPagoId()).isEqualTo(999888777L);
+        verify(reservaRepository).save(reserva);
+        verify(facturaRepository).save(any(Factura.class));
+        verify(carritoService).clearCarrito(10, 10);
+    }
+
+    @Test
+    @DisplayName("pagarReserva con pago rechazado cancela la reserva y libera asientos")
+    void pagarReserva_PagoRechazado_CancelaReserva() {
+        User usuario = User.builder().id(1).persona(cliente).build();
+
+        Asiento asiento = Asiento.builder().id(15).codigo("1A").ocupado(true).build();
+        Pasaje pasaje = Pasaje.builder().id(2).asiento(asiento).build();
+
+        Reserva reserva = Reserva.builder()
+                .id(71)
+                .codigoReserva("AC-PAGO-002")
+                .persona(cliente)
+                .estadoReserva(EstadoReserva.PROCESANDO)
+                .valor(new BigDecimal("90000.00"))
+                .cantidadPasajes(1)
+                .pasajes(new ArrayList<>(List.of(pasaje)))
+                .build();
+
+        PagoRequest pago = new PagoRequest();
+        pago.setToken("tok_rejected");
+        pago.setInstallments(1);
+        pago.setPaymentMethodId("visa");
+        pago.setPayerEmail("juan@aerogest.com");
+        pago.setPayerDocType("DNI");
+        pago.setPayerDocNumber("35123456");
+        pago.setCuil("20351234561");
+        pago.setSituacionFiscal("Consumidor Final");
+
+        when(reservaRepository.findById(71)).thenReturn(Optional.of(reserva));
+        when(mercadoPagoService.procesarPago(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(java.util.Map.of("status", "rejected", "status_detail", "cc_rejected_insufficient_amount"));
+
+        PagoResponse response = reservaService.pagarReserva(71, pago, usuario);
+
+        assertThat(response.status()).isEqualTo("rejected");
+        assertThat(response.estadoReserva()).isEqualTo(EstadoReserva.CANCELADA);
+        assertThat(asiento.getOcupado()).isFalse();
+        assertThat(pasaje.getAsiento()).isNull();
+        verify(asientoRepository).save(asiento);
+        verify(reservaRepository).save(reserva);
+        verifyNoInteractions(facturaRepository);
+    }
+
+    @Test
+    @DisplayName("pagarReserva con error de Mercado Pago lanza PagoException y no cancela la reserva")
+    void pagarReserva_ErrorMercadoPago_LanzaPagoException() {
+        User usuario = User.builder().id(1).persona(cliente).build();
+
+        Reserva reserva = Reserva.builder()
+                .id(72)
+                .codigoReserva("AC-PAGO-003")
+                .persona(cliente)
+                .estadoReserva(EstadoReserva.PROCESANDO)
+                .valor(new BigDecimal("90000.00"))
+                .cantidadPasajes(1)
+                .pasajes(new ArrayList<>())
+                .build();
+
+        PagoRequest pago = new PagoRequest();
+        pago.setToken("tok_error");
+        pago.setInstallments(1);
+        pago.setPaymentMethodId("visa");
+        pago.setPayerEmail("juan@aerogest.com");
+        pago.setPayerDocType("DNI");
+        pago.setPayerDocNumber("35123456");
+        pago.setCuil("20351234561");
+        pago.setSituacionFiscal("Consumidor Final");
+
+        when(reservaRepository.findById(72)).thenReturn(Optional.of(reserva));
+        when(mercadoPagoService.procesarPago(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(java.util.Map.of("status", "error", "error", "No se pudo comunicar con Mercado Pago"));
+
+        assertThatThrownBy(() -> reservaService.pagarReserva(72, pago, usuario))
+                .isInstanceOf(PagoException.class)
+                .hasMessageContaining("No se pudo comunicar con Mercado Pago");
+
+        assertThat(reserva.getEstadoReserva()).isEqualTo(EstadoReserva.PROCESANDO);
     }
 }

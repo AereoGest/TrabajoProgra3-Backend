@@ -1,10 +1,13 @@
 package com.example.aereopuerto.model;
 
 import com.example.aereopuerto.model.enums.RolEmpleado;
+import com.example.aereopuerto.model.enums.estadoVuelo;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 @Entity
 @Data
@@ -35,7 +38,31 @@ public class Asignacion implements Serializable {
     private RolEmpleado rolEmpleado;
 
 
+    @Transient
+    @JsonProperty("estadoAsignacion")
+    public String getEstadoAsignacion() {
 
+        if (vuelo == null) {
+            return "ASIGNADA";
+        }
+
+        // Si el vuelo fue cancelado
+        if (vuelo.getEstado() == estadoVuelo.CANCELADO) {
+            return "CANCELADA";
+        }
+
+        // Si el vuelo ya llegó a destino
+        LocalDateTime llegada = LocalDateTime.of(
+                vuelo.getFechaLlegada(),
+                vuelo.getHoraLlegada()
+        );
+
+        if (!llegada.isAfter(LocalDateTime.now())) {
+            return "FINALIZADA";
+        }
+
+        return "ASIGNADA";
+    }
 
 
 }

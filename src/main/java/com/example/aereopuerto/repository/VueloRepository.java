@@ -2,10 +2,8 @@ package com.example.aereopuerto.repository;
 
 import com.example.aereopuerto.model.Vuelo;
 import com.example.aereopuerto.model.enums.estadoVuelo;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -43,7 +41,6 @@ public interface VueloRepository extends JpaRepository<Vuelo, Integer>, JpaSpeci
     @Query("SELECT v FROM Vuelo v WHERE v.avion.id = :avionId AND v.estado IN :estados")
     List<Vuelo> findByAvionIdAndEstadoIn(@Param("avionId") Integer avionId, @Param("estados") List<estadoVuelo> estados);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT v FROM Vuelo v WHERE v.id = :id")
+    @Query(value = "SELECT * FROM vuelo WHERE vuelo_id = :id FOR UPDATE", nativeQuery = true)
     Optional<Vuelo> findByIdForUpdate(@Param("id") Integer id);
 }

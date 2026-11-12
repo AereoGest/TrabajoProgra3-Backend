@@ -23,6 +23,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.text.Normalizer;
 import java.time.Duration;
@@ -43,6 +44,7 @@ public class VueloService {
     private final AeropuertoRepository aeropuertoRepository;
     private final AvionRepository avionRepository;
     private final PasajeRepository pasajeRepository;
+    private final CancelacionVueloService cancelacionVueloService;
 
     @Cacheable(value = "vuelos", key = "#id")
     public Vuelo obtenerVueloPorId(Integer id) {
@@ -65,11 +67,19 @@ public class VueloService {
             @CacheEvict(value = "vuelos", key = "'todos'"),
             @CacheEvict(value = "vuelos", key = "'disponibles'")
     })
+    @Transactional
     public Vuelo actualizarVuelo(Integer id, VueloDTO vueloDTO) {
         Vuelo vuelo = buscarVuelo(id);
         validarNoFinalizado(vuelo, "modificar");
+        estadoVuelo estadoAnterior = vuelo.getEstado();
         prepararModificacion(vuelo, vueloDTO);
-        return vueloRepository.save(vuelo);
+        Vuelo guardado = vueloRepository.save(vuelo);
+
+        // Pasarlo a CANCELADO desde "Modificar" tiene el mismo efecto que darlo de baja
+        if (estadoAnterior != estadoVuelo.CANCELADO && guardado.getEstado() == estadoVuelo.CANCELADO) {
+            cancelacionVueloService.cancelarReservasDelVuelo(guardado);
+        }
+        return guardado;
     }
 
     /**
@@ -324,6 +334,7 @@ public class VueloService {
             @CacheEvict(value = "vuelos", key = "'todos'"),
             @CacheEvict(value = "vuelos", key = "'disponibles'")
     })
+    @Transactional
     public Vuelo darDeBajaVuelo(Integer id) {
         Vuelo vuelo = buscarVuelo(id);
 
@@ -334,7 +345,10 @@ public class VueloService {
 
         // Baja lógica: el vuelo queda registrado (reservas, pasajes e historial lo referencian)
         vuelo.setEstado(estadoVuelo.CANCELADO);
-        return vueloRepository.save(vuelo);
+        Vuelo guardado = vueloRepository.save(vuelo);
+        // Las reservas del vuelo se cancelan con reembolso total y se avisa a los clientes
+        cancelacionVueloService.cancelarReservasDelVuelo(guardado);
+        return guardado;
     }
 
     @Cacheable(value = "vuelos", key = "'todos'")

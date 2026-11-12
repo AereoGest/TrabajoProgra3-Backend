@@ -3,6 +3,7 @@ package com.example.aereopuerto.service;
 import com.example.aereopuerto.Exceptions.PagoException;
 import com.example.aereopuerto.Exceptions.PersonaInvalidaException;
 import com.example.aereopuerto.Exceptions.ReservaInvalidaException;
+import com.example.aereopuerto.auth.entity.Role;
 import com.example.aereopuerto.auth.entity.User;
 import com.example.aereopuerto.auth.repository.UserRepository;
 import com.example.aereopuerto.auth.service.UsuarioAutenticadoService;
@@ -326,8 +327,34 @@ class ReservaServiceTest {
         assertThat(asiento.getOcupado()).isFalse();
         assertThat(pasaje.getAsiento()).isNull();
         assertThat(reserva.getPasajes()).hasSize(1);
+        assertThat(reserva.getMontoReembolso()).isEqualByComparingTo("150000");
+        assertThat(reserva.getMotivoCancelacion()).isEqualTo(ReservaService.MOTIVO_CANCELADA_POR_AEROLINEA);
         verify(asientoRepository).save(asiento);
         verify(reservaRepository).save(reserva);
+    }
+
+    @Test
+    @DisplayName("Si cancela el propio cliente, se guarda el reembolso de la política y el motivo del cliente")
+    void cancelarReservaPorUsuario_cliente_guardaReembolsoYMotivo() {
+        Reserva reserva = Reserva.builder()
+                .id(61)
+                .codigoReserva("AC-2026-ABCD")
+                .persona(cliente)
+                .estadoReserva(EstadoReserva.CONFIRMADO)
+                .valor(new BigDecimal("200000"))
+                .cantidadPasajes(0)
+                .pasajes(new ArrayList<>())
+                .build();
+        User titular = User.builder().id(1).email("juan@aerogest.com").role(Role.ROLE_USUARIO).persona(cliente).build();
+
+        when(reservaRepository.findById(61)).thenReturn(Optional.of(reserva));
+        when(politicaService.calcular(reserva)).thenReturn(new BigDecimal("30000.00"));
+
+        reservaService.cancelarReservaPorUsuario(61, titular);
+
+        assertThat(reserva.getEstadoReserva()).isEqualTo(EstadoReserva.CANCELADA);
+        assertThat(reserva.getMontoReembolso()).isEqualByComparingTo("30000");
+        assertThat(reserva.getMotivoCancelacion()).isEqualTo(ReservaService.MOTIVO_CANCELADA_POR_CLIENTE);
     }
 
     @Test

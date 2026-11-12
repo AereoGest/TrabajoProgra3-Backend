@@ -52,6 +52,14 @@ public class Reserva implements Serializable {
     @Column(name = "fecha_check_in")
     private LocalDateTime fechaCheckIn;
 
+    /** Monto a devolver al cliente cuando la reserva se cancela (null si no se canceló). */
+    @Column(name = "monto_reembolso", precision = 12, scale = 2)
+    private BigDecimal montoReembolso;
+
+    /** Por qué se canceló la reserva (ej. "Vuelo cancelado por la aerolínea"). */
+    @Column(name = "motivo_cancelacion", length = 150)
+    private String motivoCancelacion;
+
     @OneToMany(mappedBy = "reserva", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     @ToString.Exclude

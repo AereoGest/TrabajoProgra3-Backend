@@ -47,6 +47,9 @@ class VueloServiceTest {
     @Mock
     private PasajeRepository pasajeRepository;
 
+    @Mock
+    private CancelacionVueloService cancelacionVueloService;
+
     @InjectMocks
     private VueloService vueloService;
 
@@ -205,6 +208,7 @@ class VueloServiceTest {
         assertEquals(estadoVuelo.REPROGRAMADO, actualizado.getEstado());
         assertEquals(990000.0, actualizado.getPrecioVuelo());
         assertEquals(madrid, actualizado.getAeropuertoDestino());
+        verify(cancelacionVueloService, never()).cancelarReservasDelVuelo(any());
     }
 
     @Test
@@ -242,6 +246,7 @@ class VueloServiceTest {
 
         assertEquals(estadoVuelo.CANCELADO, actualizado.getEstado());
         verify(vueloRepository, never()).existeConflictoHorario(anyInt(), any(), any(), any(), any(), anyInt());
+        verify(cancelacionVueloService).cancelarReservasDelVuelo(actualizado);
     }
 
     // ───────────────────────── Baja ─────────────────────────
@@ -257,6 +262,7 @@ class VueloServiceTest {
 
         assertEquals(estadoVuelo.CANCELADO, resultado.getEstado());
         verify(vueloRepository, never()).deleteById(any());
+        verify(cancelacionVueloService).cancelarReservasDelVuelo(resultado);
     }
 
     @Test
@@ -267,6 +273,7 @@ class VueloServiceTest {
 
         assertThrows(VueloInvalidoException.class, () -> vueloService.darDeBajaVuelo(3));
         verify(vueloRepository, never()).save(any());
+        verify(cancelacionVueloService, never()).cancelarReservasDelVuelo(any());
     }
 
     @Test

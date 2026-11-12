@@ -1,5 +1,6 @@
 package com.example.aereopuerto.auth.service;
 
+import com.example.aereopuerto.auth.entity.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -42,6 +43,14 @@ public class JwtService {
         });
     }
 
+    public Boolean extractIsVerified(String token) {
+        return extractClaim(token, claims -> claims.get("isVerified", Boolean.class));
+    }
+
+    public Boolean extractPerfilCompleto(String token) {
+        return extractClaim(token, claims -> claims.get("perfilCompleto", Boolean.class));
+    }
+
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
@@ -53,6 +62,10 @@ public class JwtService {
         Collection<? extends GrantedAuthority> authorities = userDetails.getAuthorities();
         if (authorities != null && !authorities.isEmpty()) {
             extraClaims.put("role", authorities.iterator().next().getAuthority());
+        }
+        if (userDetails instanceof User user) {
+            extraClaims.put("isVerified", Boolean.TRUE.equals(user.getIsVerified()));
+            extraClaims.put("perfilCompleto", Boolean.TRUE.equals(user.getPerfilCompleto()));
         }
         return buildToken(extraClaims, userDetails);
     }

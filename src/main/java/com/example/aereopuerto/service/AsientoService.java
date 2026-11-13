@@ -26,7 +26,7 @@ public class AsientoService {
     private static final List<String> LETRAS_RESTO = List.of("A", "B", "C", "D", "E", "F"); // fila 7+: económica
     static final double PRECIO_EXTRA_PRIMERA = 45000;
     static final double PRECIO_EXTRA_EJECUTIVA = 15000;
-    static final double PRECIO_EXTRA_ECONOMICA = 0;
+    static final double PRECIO_EXTRA_ECONOMICA = 5000;
 
     private static final Pattern FILA_LETRA = Pattern.compile("^(\\d+)([A-Z]*)$");
 

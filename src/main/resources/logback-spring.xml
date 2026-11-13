@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+    <!-- Silenciar avisos de bots y escáneres binarios que golpean el puerto de Tomcat -->
+    <logger name="org.apache.coyote.http11.Http11Processor" level="ERROR"/>
+</configuration>

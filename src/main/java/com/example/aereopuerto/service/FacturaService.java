@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.example.aereopuerto.dto.TransaccionDTO;
 import com.example.aereopuerto.dto.VentaDiariaDTO;
+import com.example.aereopuerto.model.enums.EstadoReserva;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -114,6 +115,15 @@ public class FacturaService {
     private TransaccionDTO aTransaccion(Factura f) {
         Reserva r = f.getReserva();
         Persona p = r.getPersona();
+
+        double total = f.getTotalPagado() != null
+                ? f.getTotalPagado()
+                : r.getValor().doubleValue();
+
+        double reembolso = r.getEstadoReserva() == EstadoReserva.CANCELADA && r.getMontoReembolso() != null
+                ? r.getMontoReembolso().doubleValue()
+                : 0.0;
+
         return TransaccionDTO.builder()
                 .facturaId(f.getId())
                 .fechaEmision(f.getFechaEmision())
@@ -124,7 +134,9 @@ public class FacturaService {
                 .cantidadPasajes(r.getCantidadPasajes())
                 .metodoDePago(f.getMetodoDePago())
                 .cuotas(f.getCuotas())
-                .total(f.getTotalPagado() != null ? f.getTotalPagado() : r.getValor().doubleValue())
+                .total(total)
+                .montoReembolso(reembolso)
+                .totalNeto(Math.max(total - reembolso, 0.0))
                 .estadoReserva(r.getEstadoReserva())
                 .build();
     }

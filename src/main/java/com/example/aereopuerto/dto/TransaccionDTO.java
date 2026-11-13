@@ -27,6 +27,8 @@ public class TransaccionDTO {
     private Integer cantidadPasajes;
     private MetodosDePago metodoDePago;
     private Integer cuotas;
-    private Double total;
+    private Double total;          // monto cobrado en la factura
+    private Double montoReembolso; // devuelto al cliente si la reserva se canceló (0 si no)
+    private Double totalNeto;      // total - montoReembolso
     private EstadoReserva estadoReserva;
 }

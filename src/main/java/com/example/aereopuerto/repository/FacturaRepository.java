@@ -22,12 +22,20 @@ public interface FacturaRepository extends JpaRepository<Factura, Integer> {
     /**
      * Ventas agrupadas por día, calculadas en la base de datos.
      * Cada fila: [fecha (DATE), cantidad (COUNT), total (SUM)].
+     * El total es neto: si la reserva se canceló, a lo cobrado se le resta el
+     * monto que se le devolvió al cliente según la política de devolución.
      */
     @Query(value = """
             SELECT DATE(f.fecha_emision)                AS fecha,
                    COUNT(*)                             AS cantidad,
-                   COALESCE(SUM(f.total_pagado), 0)     AS total
+                   COALESCE(SUM(GREATEST(
+                       COALESCE(f.total_pagado, r.valor, 0)
+                       - CASE WHEN r.estado = 'CANCELADA'
+                              THEN COALESCE(r.monto_reembolso, 0)
+                              ELSE 0 END,
+                       0)), 0)                          AS total
             FROM factura f
+            JOIN reserva r ON r.reserva_id = f.reserva_id
             WHERE f.fecha_emision >= :desde
               AND f.fecha_emision <  :hasta
             GROUP BY DATE(f.fecha_emision)

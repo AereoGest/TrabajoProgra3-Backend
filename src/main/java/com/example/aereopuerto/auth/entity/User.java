@@ -63,6 +63,13 @@ public class User implements UserDetails {
 
     private LocalDateTime twoFactorCodeExpiry;
 
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean totpEnabled = false;
+
+    @Column(name = "totp_secret")
+    private String totpSecret;
+
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

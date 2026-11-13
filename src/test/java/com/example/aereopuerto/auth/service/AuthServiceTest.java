@@ -50,6 +50,9 @@ class AuthServiceTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private TotpService totpService;
+
     @InjectMocks
     private AuthService authService;
 
@@ -267,6 +270,112 @@ class AuthServiceTest {
         assertEquals("ROLE_ADMIN", perfil.getRole());
         assertTrue(perfil.getIsVerified());
         assertTrue(perfil.getTwoFactorEnabled());
+
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("Login con TOTP habilitado solicita 2FA sin enviar email si email 2FA está deshabilitado")
+    void login_ConTotpHabilitado_Requiere2faSinEmail() {
+        testUser.setTwoFactorEnabled(false);
+        testUser.setTotpEnabled(true);
+        testUser.setTotpSecret("JBSWY3DPEHPK3PXP");
+
+        LoginRequest request = new LoginRequest();
+        request.setEmail("test@aerogest.com");
+        request.setPassword("password123");
+
+        when(userRepository.findByEmail("test@aerogest.com")).thenReturn(Optional.of(testUser));
+
+        AuthResponse response = authService.login(request);
+
+        assertNotNull(response);
+        assertTrue(response.getRequires2fa());
+        assertTrue(response.getTotpEnabled());
+        assertFalse(response.getTwoFactorEnabled());
+        verify(emailService, never()).sendTwoFactorCode(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("verify2fa con código TOTP válido autentica correctamente")
+    void verify2fa_ConCodigoTotpValido_Autentica() {
+        testUser.setTotpEnabled(true);
+        testUser.setTotpSecret("JBSWY3DPEHPK3PXP");
+        testUser.setTwoFactorEnabled(false);
+
+        Verify2FARequest request = new Verify2FARequest();
+        request.setEmail("test@aerogest.com");
+        request.setCode("654321");
+
+        when(userRepository.findByEmail("test@aerogest.com")).thenReturn(Optional.of(testUser));
+        when(totpService.verifyCode("JBSWY3DPEHPK3PXP", "654321")).thenReturn(true);
+        when(jwtService.generateToken(testUser, testUser.getId())).thenReturn("jwt-totp-success");
+
+        AuthResponse response = authService.verify2fa(request);
+
+        assertNotNull(response);
+        assertEquals("jwt-totp-success", response.getToken());
+    }
+
+    @Test
+    @DisplayName("iniciarSetupTotp genera secret y urls para la app de autenticación")
+    void iniciarSetupTotp_GeneraSecretYUrls() {
+        var auth = new UsernamePasswordAuthenticationToken(testUser.getEmail(), null, testUser.getAuthorities());
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+
+        when(userRepository.findByEmail("test@aerogest.com")).thenReturn(Optional.of(testUser));
+        when(totpService.generateSecret()).thenReturn("SECRETBASE32ABCDEF");
+        when(totpService.getOtpAuthUri("SECRETBASE32ABCDEF", "test@aerogest.com", "AeroGest"))
+                .thenReturn("otpauth://totp/AeroGest:test@aerogest.com?secret=SECRETBASE32ABCDEF");
+        when(totpService.getQrCodeUrl("otpauth://totp/AeroGest:test@aerogest.com?secret=SECRETBASE32ABCDEF"))
+                .thenReturn("https://api.qrserver.com/qr.png");
+
+        var setup = authService.iniciarSetupTotp();
+
+        assertNotNull(setup);
+        assertEquals("SECRETBASE32ABCDEF", setup.getSecret());
+        assertEquals("https://api.qrserver.com/qr.png", setup.getQrCodeUrl());
+
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("activarTotp con código válido guarda secreto y activa estado")
+    void activarTotp_ConCodigoValido_ActivaTotp() {
+        var auth = new UsernamePasswordAuthenticationToken(testUser.getEmail(), null, testUser.getAuthorities());
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+
+        when(userRepository.findByEmail("test@aerogest.com")).thenReturn(Optional.of(testUser));
+        when(totpService.verifyCode("SECRETBASE32ABCDEF", "123456")).thenReturn(true);
+
+        var req = new com.example.aereopuerto.auth.dto.TotpVerifyRequest("SECRETBASE32ABCDEF", "123456");
+        var resp = authService.activarTotp(req);
+
+        assertEquals(200, resp.getStatusCode().value());
+        assertTrue(testUser.getTotpEnabled());
+        assertEquals("SECRETBASE32ABCDEF", testUser.getTotpSecret());
+        verify(userRepository).save(testUser);
+
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("desactivarTotp limpia secreto y desactiva bandera")
+    void desactivarTotp_DesactivaTotp() {
+        testUser.setTotpEnabled(true);
+        testUser.setTotpSecret("SECRETBASE32ABCDEF");
+
+        var auth = new UsernamePasswordAuthenticationToken(testUser.getEmail(), null, testUser.getAuthorities());
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+
+        when(userRepository.findByEmail("test@aerogest.com")).thenReturn(Optional.of(testUser));
+
+        var resp = authService.desactivarTotp();
+
+        assertEquals(200, resp.getStatusCode().value());
+        assertFalse(testUser.getTotpEnabled());
+        assertNull(testUser.getTotpSecret());
+        verify(userRepository).save(testUser);
 
         org.springframework.security.core.context.SecurityContextHolder.clearContext();
     }

@@ -221,6 +221,33 @@ public class AuthController {
     }
 
     @Operation(
+            summary = "Iniciar configuración de autenticador móvil",
+            description = "Genera clave secreta y URL de QR para configurar Google Authenticator u otra app TOTP."
+    )
+    @GetMapping("/2fa/totp/setup")
+    public ResponseEntity<TotpSetupResponse> iniciarSetupTotp() {
+        return ResponseEntity.ok(authService.iniciarSetupTotp());
+    }
+
+    @Operation(
+            summary = "Activar autenticador móvil",
+            description = "Verifica el código ingresado y activa TOTP para la cuenta."
+    )
+    @PostMapping("/2fa/totp/activar")
+    public ResponseEntity<String> activarTotp(@Valid @RequestBody TotpVerifyRequest request) {
+        return authService.activarTotp(request);
+    }
+
+    @Operation(
+            summary = "Desactivar autenticador móvil",
+            description = "Desactiva la verificación TOTP para la cuenta."
+    )
+    @PostMapping("/2fa/totp/desactivar")
+    public ResponseEntity<String> desactivarTotp() {
+        return authService.desactivarTotp();
+    }
+
+    @Operation(
             summary = "Cerrar sesión",
             description = "Elimina cookies de autenticación."
     )

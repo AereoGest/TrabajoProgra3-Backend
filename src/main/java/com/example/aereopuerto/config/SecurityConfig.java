@@ -48,7 +48,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/config/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/mercadopago/public-key").permitAll()
 
-                        .requestMatchers("/api/auth/completarPerfil", "/api/auth/toggle-2fa").hasAnyAuthority("ROLE_INCOMPLETO", "ROLE_USUARIO", "ROLE_EMPLEADO", "ROLE_ADMIN")
+                        .requestMatchers("/api/auth/completarPerfil", "/api/auth/toggle-2fa", "/api/auth/2fa/**").hasAnyAuthority("ROLE_INCOMPLETO", "ROLE_USUARIO", "ROLE_EMPLEADO", "ROLE_ADMIN")
 
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 

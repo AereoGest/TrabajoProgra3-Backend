@@ -24,6 +24,7 @@ public class PerfilResponse {
     private LocalDate fechaNacimiento;
     private Sexo sexo;
     private Boolean twoFactorEnabled;
+    private Boolean totpEnabled;
     private Boolean isVerified;
     private String role;
 }

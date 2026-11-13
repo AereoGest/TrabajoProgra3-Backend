@@ -16,6 +16,8 @@ public class AuthResponse {
     private Boolean perfilCompleto;
 
     private Boolean requires2fa;
+    private Boolean twoFactorEnabled;
+    private Boolean totpEnabled;
     private String role;
     private Boolean isVerified;
 

@@ -29,6 +29,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final EmailService emailService;
+    private final TotpService totpService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthResponse login(LoginRequest request) {
@@ -39,16 +40,23 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        if (Boolean.TRUE.equals(user.getTwoFactorEnabled())) {
-            String code = String.format("%06d", secureRandom.nextInt(1_000_000));
-            user.setTwoFactorCode(code);
-            user.setTwoFactorCodeExpiry(LocalDateTime.now().plusMinutes(10));
-            userRepository.save(user);
-            emailService.sendTwoFactorCode(user.getEmail(), code);
-            
+        boolean email2fa = Boolean.TRUE.equals(user.getTwoFactorEnabled());
+        boolean totp2fa = Boolean.TRUE.equals(user.getTotpEnabled());
+
+        if (email2fa || totp2fa) {
+            if (email2fa) {
+                String code = String.format("%06d", secureRandom.nextInt(1_000_000));
+                user.setTwoFactorCode(code);
+                user.setTwoFactorCodeExpiry(LocalDateTime.now().plusMinutes(10));
+                userRepository.save(user);
+                emailService.sendTwoFactorCode(user.getEmail(), code);
+            }
+
             AuthResponse response = new AuthResponse();
             response.setRequires2fa(true);
             response.setEmail(user.getEmail());
+            response.setTwoFactorEnabled(email2fa);
+            response.setTotpEnabled(totp2fa);
             return response;
         }
 
@@ -107,6 +115,7 @@ public class AuthService {
                 .fechaNacimiento(persona.getFechaNacimiento())
                 .sexo(persona.getSexo())
                 .twoFactorEnabled(user.getTwoFactorEnabled())
+                .totpEnabled(user.getTotpEnabled())
                 .isVerified(user.getIsVerified())
                 .role(user.getRole().name())
                 .build();
@@ -223,18 +232,74 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        if (user.getTwoFactorCode() == null || user.getTwoFactorCodeExpiry() == null || user.getTwoFactorCodeExpiry().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("El código 2FA ha expirado o no es válido. Vuelve a iniciar sesión.");
-        }
-        if (!request.getCode().trim().equals(user.getTwoFactorCode())) {
-            throw new IllegalArgumentException("Código 2FA incorrecto");
+        String inputCode = request.getCode() != null ? request.getCode().trim() : "";
+        boolean verified = false;
+
+        // Validar TOTP si está activado
+        if (Boolean.TRUE.equals(user.getTotpEnabled()) && user.getTotpSecret() != null) {
+            if (totpService.verifyCode(user.getTotpSecret(), inputCode)) {
+                verified = true;
+            }
         }
 
-        user.setTwoFactorCode(null);
-        user.setTwoFactorCodeExpiry(null);
-        userRepository.save(user);
+        // Si no se validó por TOTP, verificar si coincide con el código de email generado
+        if (!verified && user.getTwoFactorCode() != null) {
+            if (user.getTwoFactorCodeExpiry() != null
+                    && !user.getTwoFactorCodeExpiry().isBefore(LocalDateTime.now())
+                    && inputCode.equals(user.getTwoFactorCode().trim())) {
+                verified = true;
+                user.setTwoFactorCode(null);
+                user.setTwoFactorCodeExpiry(null);
+                userRepository.save(user);
+            }
+        }
+
+        if (!verified) {
+            throw new IllegalArgumentException("Código de autenticación incorrecto o expirado");
+        }
 
         return buildAuthResponse(user, jwtService.generateToken(user, user.getId()));
+    }
+
+    public TotpSetupResponse iniciarSetupTotp() {
+        User user = obtenerUsuarioActual();
+        String secret = totpService.generateSecret();
+        String otpauthUrl = totpService.getOtpAuthUri(secret, user.getEmail(), "AeroGest");
+        String qrCodeUrl = totpService.getQrCodeUrl(otpauthUrl);
+
+        return TotpSetupResponse.builder()
+                .secret(secret)
+                .otpauthUrl(otpauthUrl)
+                .qrCodeUrl(qrCodeUrl)
+                .build();
+    }
+
+    public ResponseEntity<String> activarTotp(TotpVerifyRequest request) {
+        User user = obtenerUsuarioActual();
+        if (request.getSecret() == null || request.getSecret().isBlank() ||
+                request.getCode() == null || request.getCode().isBlank()) {
+            throw new IllegalArgumentException("El código y la clave secreta son requeridos");
+        }
+
+        boolean valid = totpService.verifyCode(request.getSecret().trim(), request.getCode().trim());
+        if (!valid) {
+            throw new IllegalArgumentException("El código de verificación es inválido. Asegúrate de ingresar el código actual de 6 dígitos que muestra tu app.");
+        }
+
+        user.setTotpSecret(request.getSecret().trim());
+        user.setTotpEnabled(true);
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Autenticador móvil activado exitosamente.");
+    }
+
+    public ResponseEntity<String> desactivarTotp() {
+        User user = obtenerUsuarioActual();
+        user.setTotpEnabled(false);
+        user.setTotpSecret(null);
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Autenticador móvil desactivado exitosamente.");
     }
 
     public void resendVerificationEmail(String email) {

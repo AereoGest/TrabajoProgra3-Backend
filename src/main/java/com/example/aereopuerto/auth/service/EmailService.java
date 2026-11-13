@@ -97,6 +97,33 @@ public class EmailService {
         mailSender.send(message);
     }
 
+    /** Aviso al cliente de que su reserva fue confirmada tras el pago exitoso. */
+    @Async
+    public void sendReservaConfirmadaEmail(String toEmail, String nombre, String codigoReserva,
+                                           String descripcionVuelo, BigDecimal total) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("¡Reserva confirmada! - Código " + codigoReserva);
+
+        String saludo = (nombre == null || nombre.isBlank() || "Pendiente".equals(nombre))
+                ? "Hola,\n\n" : "Hola " + nombre + ",\n\n";
+
+        String totalStr = total != null ? formatearMonto(total) : "$ 0";
+
+        message.setText(saludo +
+                "¡Tu pago fue aprobado y tu reserva está confirmada!\n\n" +
+                "Detalles de tu reserva:\n" +
+                "• Código de reserva: " + codigoReserva + "\n" +
+                (descripcionVuelo != null && !descripcionVuelo.isBlank() ? "• Vuelo: " + descripcionVuelo + "\n" : "") +
+                "• Total abonado: " + totalStr + "\n\n" +
+                "Podés consultar tus pasajes y realizar el check-in online desde tu cuenta:\n" +
+                frontendUrl + "/reservas\n\n" +
+                "¡Te deseamos un excelente vuelo!\n\n" +
+                "Saludos,\nEl equipo de AeroGest");
+
+        mailSender.send(message);
+    }
+
     private static String formatearMonto(BigDecimal monto) {
         return NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-AR")).format(monto);
     }

@@ -7,6 +7,7 @@ import com.example.aereopuerto.Specifications.ReservaSpecification;
 import com.example.aereopuerto.auth.entity.Role;
 import com.example.aereopuerto.auth.entity.User;
 import com.example.aereopuerto.auth.repository.UserRepository;
+import com.example.aereopuerto.auth.service.EmailService;
 import com.example.aereopuerto.auth.service.UsuarioAutenticadoService;
 import com.example.aereopuerto.dto.*;
 import com.example.aereopuerto.model.*;
@@ -58,6 +59,7 @@ public class ReservaService {
     private final CarritoRepository carritoRepository;
     private final CarritoService carritoService;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
+    private final EmailService emailService;
 
     @Value("${tarifas.impuesto}")
     private BigDecimal tasaImpuesto;
@@ -246,6 +248,24 @@ public class ReservaService {
                     carritoService.clearCarrito(personaId, carritoService.getCarritoByPersonaId(personaId).getId());
                 } catch (Exception e) {
                     log.warn("No se pudo vaciar el carrito para el usuario {}: {}", reserva.getPersona().getId(), e.getMessage());
+                }
+                try {
+                    String destinatario = (usuarioAutenticado != null && usuarioAutenticado.getEmail() != null)
+                            ? usuarioAutenticado.getEmail()
+                            : pago.getPayerEmail();
+                    String nombreTitular = reserva.getPersona() != null ? reserva.getPersona().getNombre() : "Pasajero";
+                    String descripcionVuelo = "";
+                    if (reserva.getPasajes() != null && !reserva.getPasajes().isEmpty() && reserva.getPasajes().get(0).getVuelo() != null) {
+                        var v = reserva.getPasajes().get(0).getVuelo();
+                        String orig = (v.getAeropuertoOrigen() != null ? v.getAeropuertoOrigen().getCiudad() : "");
+                        String dest = (v.getAeropuertoDestino() != null ? v.getAeropuertoDestino().getCiudad() : "");
+                        descripcionVuelo = orig + " → " + dest + " (" + v.getFechaSalida() + ")";
+                    }
+                    if (destinatario != null && !destinatario.isBlank()) {
+                        emailService.sendReservaConfirmadaEmail(destinatario, nombreTitular, reserva.getCodigoReserva(), descripcionVuelo, reserva.getValor());
+                    }
+                } catch (Exception e) {
+                    log.error("Error al enviar email de confirmación de reserva {}: {}", reserva.getCodigoReserva(), e.getMessage());
                 }
             }
             case "rejected" -> liberarAsientosYCancelar(reserva);

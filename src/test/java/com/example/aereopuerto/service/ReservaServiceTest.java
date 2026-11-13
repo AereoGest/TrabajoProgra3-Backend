@@ -7,6 +7,7 @@ import com.example.aereopuerto.auth.entity.Role;
 import com.example.aereopuerto.auth.entity.User;
 import com.example.aereopuerto.auth.repository.UserRepository;
 import com.example.aereopuerto.auth.service.UsuarioAutenticadoService;
+import com.example.aereopuerto.auth.service.EmailService;
 import com.example.aereopuerto.dto.CarritoDTO;
 import com.example.aereopuerto.dto.PagoRequest;
 import com.example.aereopuerto.dto.PagoResponse;
@@ -74,6 +75,8 @@ class ReservaServiceTest {
     private CarritoService carritoService;
     @Mock
     private UsuarioAutenticadoService usuarioAutenticadoService;
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private ReservaService reservaService;
@@ -414,6 +417,7 @@ class ReservaServiceTest {
         verify(reservaRepository).save(reserva);
         verify(facturaRepository).save(any(Factura.class));
         verify(carritoService).clearCarrito(10, 10);
+        verify(emailService).sendReservaConfirmadaEmail(anyString(), anyString(), eq("AC-PAGO-001"), anyString(), any(BigDecimal.class));
     }
 
     @Test

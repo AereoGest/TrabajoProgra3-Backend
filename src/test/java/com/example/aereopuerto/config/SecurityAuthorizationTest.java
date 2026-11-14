@@ -204,6 +204,16 @@ class SecurityAuthorizationTest {
 
     @Test
     @WithMockUser(roles = "USUARIO")
+    @DisplayName("GET /api/reservas/mis-reservas con rol USUARIO devuelve 200 OK")
+    void obtenerMisReservas_ConRolUsuario_Retorna200() throws Exception {
+        when(reservaService.obtenerMisReservas(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/reservas/mis-reservas"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "USUARIO")
     @DisplayName("POST /api/reservas/check-in/mostrador con rol USUARIO devuelve 403 Forbidden")
     void checkinMostrador_ConRolUsuario_Retorna403() throws Exception {
         mockMvc.perform(post("/api/reservas/check-in/mostrador")

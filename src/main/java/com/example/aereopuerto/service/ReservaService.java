@@ -11,6 +11,7 @@ import com.example.aereopuerto.auth.service.EmailService;
 import com.example.aereopuerto.auth.service.UsuarioAutenticadoService;
 import com.example.aereopuerto.dto.*;
 import com.example.aereopuerto.model.*;
+import com.example.aereopuerto.model.enums.ClasesVuelo;
 import com.example.aereopuerto.model.enums.EstadoReserva;
 import com.example.aereopuerto.model.enums.MetodosDePago;
 import com.example.aereopuerto.model.enums.estadoVuelo;
@@ -118,7 +119,7 @@ public class ReservaService {
             throw new ReservaInvalidaException("El vuelo " + vuelo.getId() + " está cancelado.");
         }
         long vendidos = pasajeRepository.countByVueloId(vuelo.getId());
-        if (vendidos + request.getCantidadPasajes() > vuelo.getAvion().getCapacidadPasajeros()) {
+        if (vendidos + request.getCantidadPasajes() > vuelo.capacidadTotalEfectiva()) {
             throw new ReservaInvalidaException("Sin disponibilidad en el vuelo " + vuelo.getId());
         }
         validarPasajeros(request);
@@ -150,6 +151,11 @@ public class ReservaService {
                             "Pasajero " + nro + ": el asiento " + asiento.getCodigo()
                                     + " no pertenece al avión de este vuelo");
                 }
+                if (asiento.getVuelo() != null && !Objects.equals(asiento.getVuelo().getId(), vuelo.getId())) {
+                    throw new ReservaInvalidaException(
+                            "Pasajero " + nro + ": el asiento " + asiento.getCodigo()
+                                    + " no pertenece a este vuelo");
+                }
                 if (Boolean.TRUE.equals(asiento.getOcupado())) {
                     throw new ReservaInvalidaException(
                             "Pasajero " + nro + ": el asiento " + asiento.getCodigo() + " ya está ocupado");
@@ -178,9 +184,13 @@ public class ReservaService {
                 extras = extras.add(BigDecimal.valueOf(asistencia.getPrecio()));
             }
 
+            ClasesVuelo claseEfectiva = asiento != null && asiento.getCategoria() != null
+                    ? asiento.getCategoria()
+                    : p.getClasesVuelo();
+
             reserva.agregarPasaje(Pasaje.builder()
                     .codigoPasaje(UUID.randomUUID().toString().substring(0, 8).toUpperCase())
-                    .clasesVuelo(p.getClasesVuelo())
+                    .clasesVuelo(claseEfectiva)
                     .vuelo(vuelo)
                     .asiento(asiento)
                     .equipajes(equipajes)
@@ -576,7 +586,7 @@ public class ReservaService {
         List<Pasaje> pasajes = pasajeRepository.findByReservaId(reserva.getId());
         for (Pasaje p : pasajes) {
             if (p.getAsiento() == null && p.getVuelo() != null && p.getVuelo().getAvion() != null) {
-                Asiento asiento = asientoService.asignarEconomicoAleatorio(p.getVuelo().getAvion().getId());
+                Asiento asiento = asientoService.asignarAleatorioParaVuelo(p.getVuelo(), p.getClasesVuelo());
                 p.setAsiento(asiento);
                 pasajeRepository.save(p);
             }

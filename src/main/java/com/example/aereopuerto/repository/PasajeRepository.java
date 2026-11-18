@@ -23,4 +23,8 @@ public interface PasajeRepository extends JpaRepository<Pasaje, Integer> {
 """)
     List<Integer> findAsientosOcupadosPorVuelo(@Param("vueloId") Integer vueloId,
                                                @Param("cancelada") EstadoReserva cancelada);
+
+    @Query("SELECT COUNT(p) FROM Pasaje p WHERE p.vuelo.id = :vueloId AND p.reserva.estadoReserva <> :cancelada")
+    long countActivosByVueloId(@Param("vueloId") Integer vueloId,
+                               @Param("cancelada") EstadoReserva cancelada);
 }

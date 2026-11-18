@@ -120,6 +120,11 @@ public class PasajeService {
                     throw new ReservaInvalidaException(
                             "El asiento " + nuevoAsiento.getCodigo() + " no pertenece al avión de este vuelo");
                 }
+                if (nuevoAsiento.getVuelo() != null
+                        && !Objects.equals(nuevoAsiento.getVuelo().getId(), vuelo.getId())) {
+                    throw new ReservaInvalidaException(
+                            "El asiento " + nuevoAsiento.getCodigo() + " no pertenece a este vuelo");
+                }
                 if (Boolean.TRUE.equals(nuevoAsiento.getOcupado())) {
                     throw new ReservaInvalidaException(
                             "El asiento " + nuevoAsiento.getCodigo() + " ya se encuentra ocupado");

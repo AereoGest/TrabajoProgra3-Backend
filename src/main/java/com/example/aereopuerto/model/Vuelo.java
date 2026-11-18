@@ -1,6 +1,7 @@
 package com.example.aereopuerto.model;
 
 import com.example.aereopuerto.model.enums.estadoVuelo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.cglib.core.Local;
@@ -66,4 +67,25 @@ public class Vuelo implements Serializable {
     private Double precioVuelo;
 
     private Boolean escala;
+
+    @Column(name = "asientos_primera")
+    private Integer asientosPrimera;
+
+    @Column(name = "asientos_ejecutiva")
+    private Integer asientosEjecutiva;
+
+    @Column(name = "asientos_economica")
+    private Integer asientosEconomica;
+
+    /**
+     * Capacidad efectiva del vuelo: suma de asientos por categoría cuando está configurada,
+     * o capacidad total del avión como fallback para vuelos previos a esta configuración.
+     */
+    @JsonIgnore
+    public int capacidadTotalEfectiva() {
+        if (asientosPrimera != null && asientosEjecutiva != null && asientosEconomica != null) {
+            return asientosPrimera + asientosEjecutiva + asientosEconomica;
+        }
+        return avion != null && avion.getCapacidadPasajeros() != null ? avion.getCapacidadPasajeros() : 0;
+    }
 }

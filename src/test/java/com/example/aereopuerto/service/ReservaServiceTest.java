@@ -226,6 +226,45 @@ class ReservaServiceTest {
     }
 
     @Test
+    @DisplayName("crearReserva rechaza asiento que pertenece a otro vuelo aunque use el mismo avión")
+    void crearReserva_AsientoDeOtroVuelo_LanzaReservaInvalidaException() {
+        Vuelo otroVuelo = Vuelo.builder().id(99).avion(avion).build();
+        Asiento asientoOtroVuelo = Asiento.builder()
+                .id(21)
+                .codigo("1A")
+                .ocupado(false)
+                .avion(avion)
+                .vuelo(otroVuelo)
+                .build();
+
+        PasajeRequest pasajeReq = new PasajeRequest();
+        pasajeReq.setClasesVuelo(ClasesVuelo.PRIMERA);
+        pasajeReq.setAsientoId(21);
+        pasajeReq.setNombre("Juan");
+        pasajeReq.setApellido("Pérez");
+        pasajeReq.setTipoDocumento(Identificador.DNI);
+        pasajeReq.setDocumento("35123456");
+        pasajeReq.setFechaNacimiento(LocalDate.of(1990, 5, 15));
+
+        ReservaRequest request = new ReservaRequest();
+        request.setPersonaId(10);
+        request.setVueloId(5);
+        request.setCantidadPasajes(1);
+        request.setPasajes(List.of(pasajeReq));
+
+        when(personaRepository.findById(10)).thenReturn(Optional.of(cliente));
+        when(userRepository.findByPersonaId(10)).thenReturn(Optional.empty());
+        when(vueloRepository.findById(5)).thenReturn(Optional.of(vuelo));
+        when(pasajeRepository.countByVueloId(5)).thenReturn(0L);
+        when(reservaRepository.existsByCodigoReserva(anyString())).thenReturn(false);
+        when(asientoRepository.findById(21)).thenReturn(Optional.of(asientoOtroVuelo));
+
+        assertThatThrownBy(() -> reservaService.crearReserva(request))
+                .isInstanceOf(ReservaInvalidaException.class)
+                .hasMessageContaining("no pertenece a este vuelo");
+    }
+
+    @Test
     @DisplayName("actualizarReserva actualiza titular, estado y valor manteniendo la cantidad real de pasajes")
     void actualizarReserva_DatosValidos_ActualizaCamposCorrectamente() {
         Persona nuevoTitular = Persona.builder()

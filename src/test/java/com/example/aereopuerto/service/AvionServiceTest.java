@@ -269,6 +269,28 @@ class AvionServiceTest {
     }
 
     @Test
+    @DisplayName("No se puede reducir la capacidad por debajo de los asientos configurados en un vuelo pendiente")
+    void actualizarAvion_reducirCapacidadBajoConfiguracionVuelo_lanzaExcepcion() {
+        Vuelo vueloConAsientos = vueloFuturo(30);
+        vueloConAsientos.setAsientosPrimera(10);
+        vueloConAsientos.setAsientosEjecutiva(30);
+        vueloConAsientos.setAsientosEconomica(120); // 160 total
+
+        when(avionRepository.findById(7)).thenReturn(Optional.of(avionExistente));
+        when(avionRepository.existsByIdentificadorIgnoreCaseAndIdNot("LV-A200", 7)).thenReturn(false);
+        when(vueloRepository.findByAvionIdAndEstadoIn(eq(7), anyList())).thenReturn(List.of(vueloConAsientos));
+        when(pasajeRepository.countByVueloId(30)).thenReturn(0L);
+
+        AvionDTO dto = dtoValido();
+        dto.setEstado(estadoAvion.DISPONIBLE);
+        dto.setCapacidadPasajeros(140);
+
+        AvionInvalidoException ex = assertThrows(AvionInvalidoException.class, () -> avionService.actualizarAvion(7, dto));
+        assertTrue(ex.getMessage().contains("160"));
+        verify(avionRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Modificación de un avión inexistente devuelve 404")
     void actualizarAvion_inexistente_404() {
         when(avionRepository.findById(99)).thenReturn(Optional.empty());

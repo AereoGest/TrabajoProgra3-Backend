@@ -1,12 +1,9 @@
 package com.example.aereopuerto.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.example.aereopuerto.model.enums.ClasesVuelo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import lombok.*;
 
 @Data
 @NoArgsConstructor
@@ -29,6 +26,17 @@ public class Asiento {
     @ManyToOne
     @JoinColumn(name = "avion_id")
     private Avion avion;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vuelo_id")
+    @JsonIgnore
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Vuelo vuelo;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "categoria", length = 20)
+    private ClasesVuelo categoria;
 
     private Boolean ocupado;
 }

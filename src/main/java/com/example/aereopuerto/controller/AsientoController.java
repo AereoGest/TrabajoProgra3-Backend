@@ -23,6 +23,11 @@ public class AsientoController {
         return ResponseEntity.ok(asientoService.obtenerAsientosPorAvion(avionId));
     }
 
+    @GetMapping("/vuelo/{vueloId}")
+    public ResponseEntity<List<AsientoDTO>> getAsientosPorVuelo(@PathVariable Integer vueloId) {
+        return ResponseEntity.ok(asientoService.obtenerAsientosPorVuelo(vueloId));
+    }
+
     @PostMapping("/verificar")
     public ResponseEntity<Map<Integer, Boolean>> verificarAsientos(@RequestBody List<Integer> ids) {
         return ResponseEntity.ok(asientoService.verificarDisponibilidad(ids));

@@ -114,7 +114,7 @@ public class AvionService {
                             + ". Reasigná o cancelá esos vuelos primero.");
         }
 
-        // No se puede achicar la capacidad por debajo de los pasajes ya vendidos
+        // No se puede achicar la capacidad por debajo de los pasajes ya vendidos ni de vuelos pendientes
         if (dto.getCapacidadPasajeros() < avion.getCapacidadPasajeros()) {
             for (Vuelo vuelo : pendientes) {
                 long vendidos = pasajeRepository.countByVueloId(vuelo.getId());
@@ -123,6 +123,14 @@ public class AvionService {
                             "No se puede reducir la capacidad a " + dto.getCapacidadPasajeros()
                                     + " pasajeros: el vuelo #" + vuelo.getId() + " ya tiene "
                                     + vendidos + " pasajes vendidos.");
+                }
+                if (vuelo.getAsientosPrimera() != null && vuelo.getAsientosEjecutiva() != null
+                        && vuelo.getAsientosEconomica() != null
+                        && vuelo.capacidadTotalEfectiva() > dto.getCapacidadPasajeros()) {
+                    throw new AvionInvalidoException(
+                            "No se puede reducir la capacidad a " + dto.getCapacidadPasajeros()
+                                    + " pasajeros: el vuelo #" + vuelo.getId() + " tiene configurados "
+                                    + vuelo.capacidadTotalEfectiva() + " asientos.");
                 }
             }
         }

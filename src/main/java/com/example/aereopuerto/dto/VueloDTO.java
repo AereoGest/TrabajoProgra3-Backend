@@ -22,4 +22,7 @@ public class VueloDTO {
     private estadoVuelo estado;
     private Double precioVuelo;
     private Boolean escala;
+    private Integer asientosPrimera;
+    private Integer asientosEjecutiva;
+    private Integer asientosEconomica;
 }

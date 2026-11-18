@@ -45,6 +45,7 @@ public class VueloService {
     private final AvionRepository avionRepository;
     private final PasajeRepository pasajeRepository;
     private final CancelacionVueloService cancelacionVueloService;
+    private final AsientoService asientoService;
 
     @Cacheable(value = "vuelos", key = "#id")
     public Vuelo obtenerVueloPorId(Integer id) {
@@ -57,10 +58,13 @@ public class VueloService {
             @CacheEvict(value = "vuelos", key = "'todos'"),
             @CacheEvict(value = "vuelos", key = "'disponibles'")
     })
+    @Transactional
     public Vuelo crearVuelo(VueloDTO vueloDTO) {
         Vuelo vuelo = new Vuelo();
         prepararAlta(vuelo, vueloDTO);
-        return vueloRepository.save(vuelo);
+        Vuelo guardado = vueloRepository.save(vuelo);
+        asientoService.sincronizarAsientosVuelo(guardado);
+        return guardado;
     }
 
     @Caching(put = { @CachePut(value = "vuelos", key = "#result.id") }, evict = {
@@ -78,6 +82,8 @@ public class VueloService {
         // Pasarlo a CANCELADO desde "Modificar" tiene el mismo efecto que darlo de baja
         if (estadoAnterior != estadoVuelo.CANCELADO && guardado.getEstado() == estadoVuelo.CANCELADO) {
             cancelacionVueloService.cancelarReservasDelVuelo(guardado);
+        } else if (guardado.getEstado() != estadoVuelo.CANCELADO) {
+            asientoService.sincronizarAsientosVuelo(guardado);
         }
         return guardado;
     }
@@ -121,6 +127,7 @@ public class VueloService {
         vuelo.setEstado(estado);
 
         validarDatosVuelo(vuelo);
+        asientoService.validarAsientosVuelo(vuelo);
         validarAvionDisponible(vuelo.getAvion().getId());
         validarDisponibilidadAvion(
                 vuelo.getAvion().getId(),
@@ -144,6 +151,7 @@ public class VueloService {
 
         // Un vuelo cancelado no ocupa el avión, así que solo se valida si sigue operativo
         if (vuelo.getEstado() != estadoVuelo.CANCELADO) {
+            asientoService.validarAsientosVuelo(vuelo);
             validarAvionDisponible(vuelo.getAvion().getId());
             validarDisponibilidadAvion(
                     vuelo.getAvion().getId(),
@@ -194,6 +202,11 @@ public class VueloService {
         if (dto.getEscala() == null) {
             throw new VueloInvalidoException("Indicá si el vuelo es directo o con escala.");
         }
+        if (dto.getAsientosPrimera() == null
+                || dto.getAsientosEjecutiva() == null
+                || dto.getAsientosEconomica() == null) {
+            throw new VueloInvalidoException("Indicá la cantidad de asientos para Primera, Ejecutiva y Económica.");
+        }
     }
 
     private void cargarDatosVuelo(Vuelo vuelo, VueloDTO vueloDTO) {
@@ -218,6 +231,9 @@ public class VueloService {
         vuelo.setHoraLlegada(vueloDTO.getHoraLlegada());
         vuelo.setPrecioVuelo(vueloDTO.getPrecioVuelo());
         vuelo.setEscala(vueloDTO.getEscala());
+        vuelo.setAsientosPrimera(vueloDTO.getAsientosPrimera());
+        vuelo.setAsientosEjecutiva(vueloDTO.getAsientosEjecutiva());
+        vuelo.setAsientosEconomica(vueloDTO.getAsientosEconomica());
     }
 
     private void validarDatosVuelo(Vuelo vuelo) {
@@ -226,6 +242,8 @@ public class VueloService {
             throw new VueloInvalidoException(
                     "El precio del vuelo debe ser mayor a 0.");
         }
+
+        AsientoService.validarCantidadesBasicas(vuelo);
 
         if (vuelo.getAeropuertoOrigen().getId()
                 .equals(vuelo.getAeropuertoDestino().getId())) {
@@ -393,7 +411,7 @@ public class VueloService {
         }
         return vuelos.stream()
                 .filter(v -> {
-                    int capacidad = v.getAvion().getCapacidadPasajeros();
+                    int capacidad = v.capacidadTotalEfectiva();
                     long vendidos = vendidosMap.getOrDefault(v.getId(), 0L);
                     return vendidos < capacidad;
                 })

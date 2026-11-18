@@ -1,10 +1,16 @@
 package com.example.aereopuerto.service;
 
 import com.example.aereopuerto.Exceptions.AvionInvalidoException;
+import com.example.aereopuerto.Exceptions.VueloInvalidoException;
+import com.example.aereopuerto.dto.AsientoDTO;
 import com.example.aereopuerto.model.Asiento;
 import com.example.aereopuerto.model.Avion;
+import com.example.aereopuerto.model.Vuelo;
+import com.example.aereopuerto.model.enums.ClasesVuelo;
+import com.example.aereopuerto.model.enums.EstadoReserva;
 import com.example.aereopuerto.repository.AsientoRepository;
 import com.example.aereopuerto.repository.PasajeRepository;
+import com.example.aereopuerto.repository.VueloRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -29,6 +36,9 @@ class AsientoServiceTest {
 
     @Mock
     private PasajeRepository pasajeRepository;
+
+    @Mock
+    private VueloRepository vueloRepository;
 
     @InjectMocks
     private AsientoService asientoService;
@@ -67,7 +77,7 @@ class AsientoServiceTest {
     @Test
     @DisplayName("Avión nuevo: se crean tantos asientos como su capacidad, todos libres")
     void sincronizar_avionNuevo_creaTodos() {
-        when(asientoRepository.findByAvionId(7)).thenReturn(List.of());
+        when(asientoRepository.findByAvionIdAndVueloIsNull(7)).thenReturn(List.of());
         Avion avion = avion(180);
 
         asientoService.sincronizarAsientos(avion);
@@ -81,7 +91,7 @@ class AsientoServiceTest {
     @Test
     @DisplayName("Avión con algunos asientos: completa solo los que faltan sin repetir códigos")
     void sincronizar_completaFaltantes() {
-        when(asientoRepository.findByAvionId(7)).thenReturn(new ArrayList<>(List.of(
+        when(asientoRepository.findByAvionIdAndVueloIsNull(7)).thenReturn(new ArrayList<>(List.of(
                 asiento(1, "1A", true), asiento(2, "1B", false), asiento(3, "12A", false))));
 
         asientoService.sincronizarAsientos(avion(50));
@@ -96,7 +106,7 @@ class AsientoServiceTest {
     void sincronizar_achicar_quitaUltimasFilasLibres() {
         List<Asiento> actuales = List.of(
                 asiento(1, "7A", false), asiento(2, "7B", false), asiento(3, "10A", false), asiento(4, "9F", false));
-        when(asientoRepository.findByAvionId(7)).thenReturn(actuales);
+        when(asientoRepository.findByAvionIdAndVueloIsNull(7)).thenReturn(actuales);
         when(pasajeRepository.existsByAsientoId(anyInt())).thenReturn(false);
 
         asientoService.sincronizarAsientos(avion(2));
@@ -108,12 +118,151 @@ class AsientoServiceTest {
     @Test
     @DisplayName("No se puede achicar si no alcanzan los asientos libres (ocupados o con pasaje)")
     void validarCambioCapacidad_sinLibresSuficientes_lanzaExcepcion() {
-        when(asientoRepository.findByAvionId(7)).thenReturn(List.of(
+        when(asientoRepository.findByAvionIdAndVueloIsNull(7)).thenReturn(List.of(
                 asiento(1, "7A", true), asiento(2, "7B", false), asiento(3, "7C", false)));
         when(pasajeRepository.existsByAsientoId(2)).thenReturn(true);   // 7B tiene pasaje
         when(pasajeRepository.existsByAsientoId(3)).thenReturn(false);
 
         assertThrows(AvionInvalidoException.class, () -> asientoService.validarCambioCapacidad(7, 1));
         verify(asientoRepository, never()).deleteAll(any());
+    }
+
+    // ───────────────────────── Asientos por vuelo ─────────────────────────
+
+    @Test
+    @DisplayName("La distribución por vuelo respeta cantidades configuradas y omite filas de categorías en 0")
+    void distribucionVuelo_respetaCantidadesYFilas() {
+        List<AsientoService.AsientoPlanificado> plan = AsientoService.distribucionVuelo(0, 6, 8);
+
+        assertEquals(14, plan.size());
+        assertEquals(6, plan.stream().filter(a -> a.categoria() == ClasesVuelo.BUSINESS).count());
+        assertEquals(8, plan.stream().filter(a -> a.categoria() == ClasesVuelo.ECONOMICA).count());
+        assertEquals("1A", plan.get(0).codigo());
+        assertEquals(ClasesVuelo.BUSINESS, plan.get(0).categoria());
+        assertEquals("2A", plan.get(6).codigo());
+        assertEquals(ClasesVuelo.ECONOMICA, plan.get(6).categoria());
+    }
+
+    @Test
+    @DisplayName("Vuelo nuevo: genera asientos vinculados al vuelo con su categoría y precio extra")
+    void sincronizarVuelo_nuevo_creaAsientosPorCategoria() {
+        Avion av = avion(100);
+        Vuelo vuelo = Vuelo.builder().id(10).avion(av)
+                .asientosPrimera(4).asientosEjecutiva(6).asientosEconomica(10).build();
+
+        when(pasajeRepository.countActivosByVueloId(10, EstadoReserva.CANCELADA)).thenReturn(0L);
+        when(asientoRepository.findByVueloId(10)).thenReturn(List.of());
+
+        asientoService.sincronizarAsientosVuelo(vuelo);
+
+        List<Asiento> guardados = capturarGuardados();
+        assertEquals(20, guardados.size());
+        assertEquals(4, guardados.stream().filter(a -> a.getCategoria() == ClasesVuelo.PRIMERA).count());
+        assertEquals(6, guardados.stream().filter(a -> a.getCategoria() == ClasesVuelo.BUSINESS).count());
+        assertEquals(10, guardados.stream().filter(a -> a.getCategoria() == ClasesVuelo.ECONOMICA).count());
+        assertTrue(guardados.stream().allMatch(a -> a.getVuelo() == vuelo && a.getAvion() == av));
+    }
+
+    @Test
+    @DisplayName("Modificar vuelo: impide reducir categoría por debajo de asientos ocupados")
+    void validarAsientosVuelo_reduceDebajoDeOcupados_lanzaExcepcion() {
+        Avion av = avion(100);
+        Vuelo vuelo = Vuelo.builder().id(10).avion(av)
+                .asientosPrimera(1).asientosEjecutiva(6).asientosEconomica(10).build();
+
+        Asiento p1 = Asiento.builder().id(1).codigo("1A").avion(av).vuelo(vuelo)
+                .categoria(ClasesVuelo.PRIMERA).ocupado(true).precioExtra(45000.0).build();
+        Asiento p2 = Asiento.builder().id(2).codigo("1C").avion(av).vuelo(vuelo)
+                .categoria(ClasesVuelo.PRIMERA).ocupado(true).precioExtra(45000.0).build();
+
+        when(pasajeRepository.countActivosByVueloId(10, EstadoReserva.CANCELADA)).thenReturn(2L);
+        when(asientoRepository.findByVueloId(10)).thenReturn(List.of(p1, p2));
+
+        VueloInvalidoException ex = assertThrows(VueloInvalidoException.class,
+                () -> asientoService.validarAsientosVuelo(vuelo));
+        assertTrue(ex.getMessage().contains("Primera"));
+    }
+
+    @Test
+    @DisplayName("obtenerAsientosPorVuelo usa los asientos del vuelo cuando existen y calcula ocupación real")
+    void obtenerAsientosPorVuelo_conPropios_devuelveCategoriaYOcupacion() {
+        Avion av = avion(100);
+        Vuelo vuelo = Vuelo.builder().id(10).avion(av).build();
+
+        Asiento a1 = Asiento.builder().id(101).codigo("1A").avion(av).vuelo(vuelo)
+                .categoria(ClasesVuelo.PRIMERA).precioExtra(45000.0).ocupado(false).build();
+        Asiento a2 = Asiento.builder().id(102).codigo("2A").avion(av).vuelo(vuelo)
+                .categoria(ClasesVuelo.ECONOMICA).precioExtra(0.0).ocupado(false).build();
+
+        when(vueloRepository.findById(10)).thenReturn(Optional.of(vuelo));
+        when(asientoRepository.findByVueloId(10)).thenReturn(List.of(a2, a1));
+        when(pasajeRepository.findAsientosOcupadosPorVuelo(10, EstadoReserva.CANCELADA)).thenReturn(List.of(102));
+
+        List<AsientoDTO> resultado = asientoService.obtenerAsientosPorVuelo(10);
+
+        assertEquals(2, resultado.size());
+        assertEquals("1A", resultado.get(0).getCodigo());
+        assertEquals(ClasesVuelo.PRIMERA, resultado.get(0).getCategoria());
+        assertFalse(resultado.get(0).getOcupado());
+        assertEquals("2A", resultado.get(1).getCodigo());
+        assertEquals(ClasesVuelo.ECONOMICA, resultado.get(1).getCategoria());
+        assertTrue(resultado.get(1).getOcupado());
+    }
+
+    @Test
+    @DisplayName("obtenerAsientosPorVuelo para vuelos legacy hace fallback al avión y usa ocupación por pasaje del vuelo")
+    void obtenerAsientosPorVuelo_legacyFallback_aAvion() {
+        Avion av = avion(100);
+        Vuelo vuelo = Vuelo.builder().id(15).avion(av).build();
+
+        Asiento legacy1 = Asiento.builder().id(5).codigo("1A").avion(av).precioExtra(45000.0).ocupado(true).build();
+        Asiento legacy2 = Asiento.builder().id(6).codigo("3A").avion(av).precioExtra(0.0).ocupado(false).build();
+
+        when(vueloRepository.findById(15)).thenReturn(Optional.of(vuelo));
+        when(asientoRepository.findByVueloId(15)).thenReturn(List.of());
+        when(asientoRepository.findByAvionIdAndVueloIsNull(7)).thenReturn(List.of(legacy1, legacy2));
+        when(pasajeRepository.findAsientosOcupadosPorVuelo(15, EstadoReserva.CANCELADA)).thenReturn(List.of(6));
+
+        List<AsientoDTO> resultado = asientoService.obtenerAsientosPorVuelo(15);
+
+        assertEquals(2, resultado.size());
+        // legacy1 marcado ocupado en otro vuelo no bloquea este vuelo si no tiene pasaje en vuelo 15
+        assertEquals("1A", resultado.get(0).getCodigo());
+        assertFalse(resultado.get(0).getOcupado());
+        assertEquals("3A", resultado.get(1).getCodigo());
+        assertEquals(ClasesVuelo.ECONOMICA, resultado.get(1).getCategoria());
+        assertTrue(resultado.get(1).getOcupado());
+    }
+
+    @Test
+    @DisplayName("Modificar vuelo con asientos ocupados: conserva los ocupados y ajusta cantidades sin colisiones")
+    void sincronizarVuelo_conOcupados_preservaOcupadosYSinColisiones() {
+        Avion av = avion(100);
+        Vuelo vuelo = Vuelo.builder().id(10).avion(av)
+                .asientosPrimera(1).asientosEjecutiva(2).asientosEconomica(2).build();
+
+        Asiento p1 = Asiento.builder().id(1).codigo("1A").avion(av).vuelo(vuelo)
+                .categoria(ClasesVuelo.PRIMERA).ocupado(true).precioExtra(45000.0).build();
+        Asiento p2 = Asiento.builder().id(2).codigo("1C").avion(av).vuelo(vuelo)
+                .categoria(ClasesVuelo.PRIMERA).ocupado(false).precioExtra(45000.0).build();
+        Asiento e1 = Asiento.builder().id(3).codigo("2A").avion(av).vuelo(vuelo)
+                .categoria(ClasesVuelo.ECONOMICA).ocupado(false).precioExtra(0.0).build();
+
+        when(pasajeRepository.countActivosByVueloId(10, EstadoReserva.CANCELADA)).thenReturn(1L);
+        when(asientoRepository.findByVueloId(10)).thenReturn(List.of(p1, p2, e1));
+        when(pasajeRepository.existsByAsientoId(anyInt())).thenReturn(false);
+
+        asientoService.sincronizarAsientosVuelo(vuelo);
+
+        verify(asientoRepository).deleteAll(List.of(p2));
+        List<Asiento> guardados = capturarGuardados();
+        assertEquals(3, guardados.size()); // +2 Ejecutiva +1 Económica
+        assertEquals(2, guardados.stream().filter(a -> a.getCategoria() == ClasesVuelo.BUSINESS).count());
+        assertEquals(1, guardados.stream().filter(a -> a.getCategoria() == ClasesVuelo.ECONOMICA).count());
+        // Ningún código nuevo colisiona con 1A o 2A ni mezcla fila 2 (de Económica) con Ejecutiva
+        assertTrue(guardados.stream().noneMatch(a -> a.getCodigo().equals("1A") || a.getCodigo().equals("2A")));
+        assertTrue(guardados.stream()
+                .filter(a -> a.getCategoria() == ClasesVuelo.BUSINESS)
+                .noneMatch(a -> a.getCodigo().startsWith("2")));
     }
 }

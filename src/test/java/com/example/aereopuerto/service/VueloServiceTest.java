@@ -50,6 +50,9 @@ class VueloServiceTest {
     @Mock
     private CancelacionVueloService cancelacionVueloService;
 
+    @Mock
+    private AsientoService asientoService;
+
     @InjectMocks
     private VueloService vueloService;
 
@@ -78,6 +81,9 @@ class VueloServiceTest {
         dto.setHoraLlegada(LocalTime.of(22, 0));
         dto.setPrecioVuelo(850000.0);
         dto.setEscala(false);
+        dto.setAsientosPrimera(8);
+        dto.setAsientosEjecutiva(24);
+        dto.setAsientosEconomica(148);
         return dto;
     }
 
@@ -102,7 +108,11 @@ class VueloServiceTest {
         assertEquals(ezeiza, creado.getAeropuertoOrigen());
         assertEquals(madrid, creado.getAeropuertoDestino());
         assertEquals(avionDisponible, creado.getAvion());
+        assertEquals(8, creado.getAsientosPrimera());
+        assertEquals(24, creado.getAsientosEjecutiva());
+        assertEquals(148, creado.getAsientosEconomica());
         verify(vueloRepository).save(any(Vuelo.class));
+        verify(asientoService).sincronizarAsientosVuelo(creado);
     }
 
     @Test
@@ -375,5 +385,76 @@ class VueloServiceTest {
         when(vueloRepository.findById(99)).thenReturn(Optional.empty());
 
         assertThrows(VueloInvalidoException.class, () -> vueloService.darDeBajaVuelo(99));
+    }
+
+    // ───────────────────────── Asientos por categoría ─────────────────────────
+
+    @Test
+    @DisplayName("Alta sin cantidades de asientos por categoría lanza excepción")
+    void crearVuelo_sinCantidadesAsientos_lanzaExcepcion() {
+        VueloDTO dto = dtoValido();
+        dto.setAsientosPrimera(null);
+
+        assertThrows(VueloInvalidoException.class, () -> vueloService.crearVuelo(dto));
+        verify(vueloRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Alta con cantidad negativa de asientos lanza excepción")
+    void crearVuelo_asientosNegativos_lanzaExcepcion() {
+        VueloDTO dto = dtoValido();
+        dto.setAsientosEjecutiva(-1);
+        mockearReferencias();
+
+        assertThrows(VueloInvalidoException.class, () -> vueloService.crearVuelo(dto));
+        verify(vueloRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Alta con 0 asientos en todas las categorías lanza excepción")
+    void crearVuelo_ceroAsientosTotales_lanzaExcepcion() {
+        VueloDTO dto = dtoValido();
+        dto.setAsientosPrimera(0);
+        dto.setAsientosEjecutiva(0);
+        dto.setAsientosEconomica(0);
+        mockearReferencias();
+
+        assertThrows(VueloInvalidoException.class, () -> vueloService.crearVuelo(dto));
+        verify(vueloRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Alta cuya suma supera la capacidad del avión lanza excepción")
+    void crearVuelo_superaCapacidadAvion_lanzaExcepcion() {
+        VueloDTO dto = dtoValido();
+        dto.setAsientosPrimera(20);
+        dto.setAsientosEjecutiva(40);
+        dto.setAsientosEconomica(130); // 190 > 180
+        mockearReferencias();
+
+        VueloInvalidoException ex = assertThrows(VueloInvalidoException.class, () -> vueloService.crearVuelo(dto));
+        assertTrue(ex.getMessage().contains("supera la capacidad"));
+        verify(vueloRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Alta permitiendo 0 en alguna categoría y suma menor o igual a capacidad es válida")
+    void crearVuelo_conCeroEnUnaCategoriaYSumaMenorACapacidad_creaExitosamente() {
+        mockearReferencias();
+        when(vueloRepository.existeConflictoHorario(eq(7), any(), any(), any(), any(), eq(-1))).thenReturn(false);
+        when(vueloRepository.save(any(Vuelo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        VueloDTO dto = dtoValido();
+        dto.setAsientosPrimera(0);
+        dto.setAsientosEjecutiva(20);
+        dto.setAsientosEconomica(100); // 120 <= 180
+
+        Vuelo creado = vueloService.crearVuelo(dto);
+
+        assertEquals(0, creado.getAsientosPrimera());
+        assertEquals(20, creado.getAsientosEjecutiva());
+        assertEquals(100, creado.getAsientosEconomica());
+        assertEquals(120, creado.capacidadTotalEfectiva());
+        verify(asientoService).sincronizarAsientosVuelo(creado);
     }
 }

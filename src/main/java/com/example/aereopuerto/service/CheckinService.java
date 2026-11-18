@@ -9,6 +9,7 @@ import com.example.aereopuerto.model.Pasaje;
 import com.example.aereopuerto.model.Persona;
 import com.example.aereopuerto.model.Reserva;
 import com.example.aereopuerto.model.Vuelo;
+import com.example.aereopuerto.model.enums.ClasesVuelo;
 import com.example.aereopuerto.model.enums.EstadoReserva;
 import com.example.aereopuerto.repository.AsientoRepository;
 import com.example.aereopuerto.repository.PasajeRepository;
@@ -28,15 +29,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class CheckinService {
-
-    private static final Pattern FILA = Pattern.compile("(\\d+)");
-    private static final int PRIMERA_FILA_ECONOMICA = 7;
 
     private final ReservaRepository reservaRepository;
     private final PasajeRepository pasajeRepository;
@@ -147,10 +143,7 @@ public class CheckinService {
                 Set<Integer> ocupados = ocupadosPorVuelo.computeIfAbsent(vuelo.getId(),
                         id -> new HashSet<>(pasajeRepository.findAsientosOcupadosPorVuelo(id, EstadoReserva.CANCELADA)));
 
-                List<Asiento> libres = asientoRepository.findByAvionId(vuelo.getAvion().getId()).stream()
-                        .filter(a -> !ocupados.contains(a.getId()))
-                        .filter(this::esEconomico) // TODO: elegir según pasaje.getClasesVuelo()
-                        .toList();
+                List<Asiento> libres = asientosDisponiblesParaCheckin(vuelo, pasaje.getClasesVuelo(), ocupados);
 
                 if (libres.isEmpty()) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -158,6 +151,10 @@ public class CheckinService {
                 }
 
                 Asiento elegido = libres.get(ThreadLocalRandom.current().nextInt(libres.size()));
+                if (elegido.getVuelo() != null) {
+                    elegido.setOcupado(true);
+                    asientoRepository.save(elegido);
+                }
                 pasaje.setAsiento(elegido);
                 ocupados.add(elegido.getId());
                 asignadosAhora.add(pasaje.getId());
@@ -215,9 +212,34 @@ public class CheckinService {
         return aeropuerto.getCiudad() + " (" + aeropuerto.getCodigoIata() + ")";
     }
 
-    private boolean esEconomico(Asiento asiento) {
-        if (asiento.getCodigo() == null) return false;
-        Matcher m = FILA.matcher(asiento.getCodigo());
-        return m.find() && Integer.parseInt(m.group(1)) >= PRIMERA_FILA_ECONOMICA;
+    private List<Asiento> asientosDisponiblesParaCheckin(
+            Vuelo vuelo, ClasesVuelo clasePasaje, Set<Integer> ocupados) {
+        List<Asiento> candidatos = asientoRepository.findByVueloId(vuelo.getId());
+        boolean usaPropios = !candidatos.isEmpty();
+        if (!usaPropios && vuelo.getAvion() != null) {
+            candidatos = asientoRepository.findByAvionIdAndVueloIsNull(vuelo.getAvion().getId());
+        }
+
+        List<Asiento> disponibles = candidatos.stream()
+                .filter(a -> !ocupados.contains(a.getId()) && (!usaPropios || !Boolean.TRUE.equals(a.getOcupado())))
+                .toList();
+
+        ClasesVuelo objetivo = clasePasaje == ClasesVuelo.TURISTA || clasePasaje == null
+                ? ClasesVuelo.ECONOMICA
+                : clasePasaje;
+
+        List<Asiento> porClase = disponibles.stream()
+                .filter(a -> AsientoService.categoriaEfectiva(a) == objetivo)
+                .toList();
+        if (!porClase.isEmpty()) {
+            return porClase;
+        }
+        if (objetivo != ClasesVuelo.ECONOMICA) {
+            List<Asiento> economicos = disponibles.stream()
+                    .filter(a -> AsientoService.categoriaEfectiva(a) == ClasesVuelo.ECONOMICA)
+                    .toList();
+            if (!economicos.isEmpty()) return economicos;
+        }
+        return disponibles;
     }
 }

@@ -29,9 +29,9 @@ public class AsientoService {
     static final int ULTIMA_FILA_EJECUTIVA = 6;   // filas 3-6: ejecutiva, asientos A-F
     private static final List<String> LETRAS_PRIMERA = List.of("A", "C", "E", "G");
     private static final List<String> LETRAS_RESTO = List.of("A", "B", "C", "D", "E", "F"); // fila 7+: económica
-    static final double PRECIO_EXTRA_PRIMERA = 45000;
-    static final double PRECIO_EXTRA_EJECUTIVA = 15000;
-    static final double PRECIO_EXTRA_ECONOMICA = 5000;
+    static final double PRECIO_EXTRA_PRIMERA = 100000;
+    static final double PRECIO_EXTRA_EJECUTIVA = 70000;
+    static final double PRECIO_EXTRA_ECONOMICA = 50000;
 
     private static final Pattern FILA_LETRA = Pattern.compile("^(\\d+)([A-Z]*)$");
 

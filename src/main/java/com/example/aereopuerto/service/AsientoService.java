@@ -57,9 +57,22 @@ public class AsientoService {
     }
 
     private static ClasesVuelo categoriaPorPrecio(double precioExtra) {
-        if (precioExtra >= 40000) return ClasesVuelo.PRIMERA;
+        if (precioExtra == PRECIO_EXTRA_PRIMERA) return ClasesVuelo.PRIMERA;
+        if (precioExtra == PRECIO_EXTRA_EJECUTIVA) return ClasesVuelo.BUSINESS;
+        if (precioExtra == PRECIO_EXTRA_ECONOMICA) return ClasesVuelo.ECONOMICA;
+        // Fallback para asientos legacy de datos_prueba.sql sin columna categoría
+        if (precioExtra == 45000 || precioExtra == 40000) return ClasesVuelo.PRIMERA;
+        if (precioExtra >= 15000 && precioExtra < 40000) return ClasesVuelo.BUSINESS;
+        if (precioExtra >= PRECIO_EXTRA_PRIMERA) return ClasesVuelo.PRIMERA;
         if (precioExtra >= PRECIO_EXTRA_EJECUTIVA) return ClasesVuelo.BUSINESS;
         return ClasesVuelo.ECONOMICA;
+    }
+
+    /** Tarifa extra vigente configurada para cada categoría. */
+    public static double precioPorCategoria(ClasesVuelo categoria) {
+        if (categoria == ClasesVuelo.PRIMERA) return PRECIO_EXTRA_PRIMERA;
+        if (categoria == ClasesVuelo.BUSINESS) return PRECIO_EXTRA_EJECUTIVA;
+        return PRECIO_EXTRA_ECONOMICA;
     }
 
     /** Determina la categoría efectiva de un asiento (con fallback para registros legacy sin columna categoría). */
@@ -76,14 +89,10 @@ public class AsientoService {
         return ClasesVuelo.ECONOMICA;
     }
 
-    /** Precio extra efectivo al elegir el asiento (asigna 5000 a Económica si en BD figuraba en 0). */
+    /** Precio extra efectivo al elegir el asiento, siempre alineado a las tarifas vigentes por categoría. */
     public static double precioExtraEfectivo(Asiento asiento) {
         if (asiento == null) return 0;
-        Double extra = asiento.getPrecioExtra();
-        if (extra != null && extra > 0) {
-            return extra;
-        }
-        return categoriaEfectiva(asiento) == ClasesVuelo.ECONOMICA ? PRECIO_EXTRA_ECONOMICA : 0;
+        return precioPorCategoria(categoriaEfectiva(asiento));
     }
 
     /**

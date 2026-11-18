@@ -203,11 +203,41 @@ class AsientoServiceTest {
         assertEquals(2, resultado.size());
         assertEquals("1A", resultado.get(0).getCodigo());
         assertEquals(ClasesVuelo.PRIMERA, resultado.get(0).getCategoria());
+        assertEquals(AsientoService.PRECIO_EXTRA_PRIMERA, resultado.get(0).getPrecioExtra());
         assertFalse(resultado.get(0).getOcupado());
         assertEquals("2A", resultado.get(1).getCodigo());
         assertEquals(ClasesVuelo.ECONOMICA, resultado.get(1).getCategoria());
-        assertEquals(5000.0, resultado.get(1).getPrecioExtra());
+        assertEquals(AsientoService.PRECIO_EXTRA_ECONOMICA, resultado.get(1).getPrecioExtra());
         assertTrue(resultado.get(1).getOcupado());
+    }
+
+    @Test
+    @DisplayName("Aplica tarifas vigentes en las 3 categorías incluso sobre asientos legacy guardados con precios viejos")
+    void obtenerAsientosPorVuelo_asientosLegacyConPreciosViejos_aplicaTarifasVigentes() {
+        Avion av = avion(100);
+        Vuelo vuelo = Vuelo.builder().id(20).avion(av).build();
+
+        Asiento pri = Asiento.builder().id(1).codigo("1A").avion(av).precioExtra(45000.0).ocupado(false).build();
+        Asiento eje = Asiento.builder().id(2).codigo("2A").avion(av).precioExtra(25000.0).ocupado(false).build();
+        Asiento eco = Asiento.builder().id(3).codigo("3A").avion(av).precioExtra(0.0).ocupado(false).build();
+        Asiento ecoTarifaActual = Asiento.builder().id(4).codigo("4A").avion(av)
+                .precioExtra(AsientoService.PRECIO_EXTRA_ECONOMICA).ocupado(false).build();
+
+        when(vueloRepository.findById(20)).thenReturn(Optional.of(vuelo));
+        when(asientoRepository.findByVueloId(20)).thenReturn(List.of());
+        when(asientoRepository.findByAvionIdAndVueloIsNull(7)).thenReturn(List.of(ecoTarifaActual, eco, eje, pri));
+        when(pasajeRepository.findAsientosOcupadosPorVuelo(20, EstadoReserva.CANCELADA)).thenReturn(List.of());
+
+        List<AsientoDTO> resultado = asientoService.obtenerAsientosPorVuelo(20);
+
+        assertEquals(ClasesVuelo.PRIMERA, resultado.get(0).getCategoria());
+        assertEquals(AsientoService.PRECIO_EXTRA_PRIMERA, resultado.get(0).getPrecioExtra());
+        assertEquals(ClasesVuelo.BUSINESS, resultado.get(1).getCategoria());
+        assertEquals(AsientoService.PRECIO_EXTRA_EJECUTIVA, resultado.get(1).getPrecioExtra());
+        assertEquals(ClasesVuelo.ECONOMICA, resultado.get(2).getCategoria());
+        assertEquals(AsientoService.PRECIO_EXTRA_ECONOMICA, resultado.get(2).getPrecioExtra());
+        assertEquals(ClasesVuelo.ECONOMICA, resultado.get(3).getCategoria());
+        assertEquals(AsientoService.PRECIO_EXTRA_ECONOMICA, resultado.get(3).getPrecioExtra());
     }
 
     @Test

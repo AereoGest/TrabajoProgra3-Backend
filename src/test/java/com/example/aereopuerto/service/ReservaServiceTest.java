@@ -119,7 +119,8 @@ class ReservaServiceTest {
                 .id(20)
                 .codigo("12A")
                 .ocupado(false)
-                .precioExtra(10000.0)
+                .categoria(ClasesVuelo.ECONOMICA)
+                .precioExtra(AsientoService.PRECIO_EXTRA_ECONOMICA)
                 .avion(avion)
                 .build();
 
@@ -162,21 +163,21 @@ class ReservaServiceTest {
         assertThat(resultado.getCantidadPasajes()).isEqualTo(1);
         assertThat(resultado.getPasajes()).hasSize(1);
         assertThat(resultado.getPersona().getEmail()).isEqualTo("juan@aerogest.com");
-        // base 100000 + extras 10000 + impuestos (21000) = 131000; + 5% servicio (6550) = 137550
-        assertThat(resultado.getValor()).isEqualByComparingTo("137550");
+        // base 100000 + extras ECONOMICA (50000) + impuestos (21000) = 171000; + 5% servicio (8550) = 179550
+        assertThat(resultado.getValor()).isEqualByComparingTo("179550");
         assertThat(asiento.getOcupado()).isTrue();
         verify(asientoRepository).save(asiento);
     }
 
     @Test
-    @DisplayName("crearReserva cobra $5.000 si elige asiento turista y $0 (clase turista) si no elige asiento")
+    @DisplayName("crearReserva cobra la tarifa vigente si elige asiento turista y $0 (clase turista) si no elige asiento")
     void crearReserva_PrecioClaseTuristaVsSinSeleccionar() {
         Asiento asientoEco = Asiento.builder()
                 .id(25)
                 .codigo("7A")
                 .ocupado(false)
                 .categoria(ClasesVuelo.ECONOMICA)
-                .precioExtra(5000.0)
+                .precioExtra(0.0) // incluso si en BD tenía precio legacy en 0, aplica PRECIO_EXTRA_ECONOMICA vigente
                 .avion(avion)
                 .vuelo(vuelo)
                 .build();
@@ -218,8 +219,8 @@ class ReservaServiceTest {
 
         Reserva resultado = reservaService.crearReserva(request);
 
-        // base = 200000, extras = 5000 (solo asientoEco), imp = 42000, subtotal = 247000, serv = 12350 -> 259350
-        assertThat(resultado.getValor()).isEqualByComparingTo("259350");
+        // base = 200000, extras = 50000 (solo asientoEco), imp = 42000, subtotal = 292000, serv = 14600 -> 306600
+        assertThat(resultado.getValor()).isEqualByComparingTo("306600");
         assertThat(resultado.getPasajes().get(0).getClasesVuelo()).isEqualTo(ClasesVuelo.ECONOMICA);
         assertThat(resultado.getPasajes().get(1).getAsiento()).isNull();
         assertThat(resultado.getPasajes().get(1).getClasesVuelo()).isEqualTo(ClasesVuelo.ECONOMICA);

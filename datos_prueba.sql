@@ -56,25 +56,25 @@ INSERT INTO avion (avion_id, identificador, modelo, capacidad_pasajeros, capacid
 -- ------------------------------------------------------------------------------
 INSERT INTO asiento (id, codigo, precio_extra, avion_id, ocupado) VALUES
 -- Avión 1 (Boeing 737-800)
-(1, '1A', 45000.00, 1, 0), -- Primera Clase
-(2, '1B', 45000.00, 1, 0), -- Primera Clase
-(3, '1C', 45000.00, 1, 0), -- Primera Clase
-(4, '1D', 45000.00, 1, 0), -- Primera Clase
-(5, '2A', 25000.00, 1, 0), -- Business
-(6, '2B', 25000.00, 1, 0), -- Business
-(7, '2C', 25000.00, 1, 1), -- Business (Ocupado)
-(8, '2D', 25000.00, 1, 0), -- Business
-(9, '3A', 5000.00, 1, 0),     -- Económica
-(10, '3B', 5000.00, 1, 0),    -- Económica
-(11, '3C', 5000.00, 1, 1),    -- Económica (Ocupado)
-(12, '3D', 5000.00, 1, 0),    -- Económica
-(13, '4A', 5000.00, 1, 0),    -- Económica
-(14, '4B', 5000.00, 1, 0),    -- Económica
+(1, '1A', 100000.00, 1, 0), -- Primera Clase
+(2, '1B', 100000.00, 1, 0), -- Primera Clase
+(3, '1C', 100000.00, 1, 0), -- Primera Clase
+(4, '1D', 100000.00, 1, 0), -- Primera Clase
+(5, '2A', 70000.00, 1, 0),  -- Business
+(6, '2B', 70000.00, 1, 0),  -- Business
+(7, '2C', 70000.00, 1, 1),  -- Business (Ocupado)
+(8, '2D', 70000.00, 1, 0),  -- Business
+(9, '3A', 50000.00, 1, 0),  -- Económica
+(10, '3B', 50000.00, 1, 0), -- Económica
+(11, '3C', 50000.00, 1, 1), -- Económica (Ocupado)
+(12, '3D', 50000.00, 1, 0), -- Económica
+(13, '4A', 50000.00, 1, 0), -- Económica
+(14, '4B', 50000.00, 1, 0), -- Económica
 -- Avión 2 (Airbus A320neo)
-(15, '1A', 40000.00, 2, 0),
-(16, '1B', 40000.00, 2, 0),
-(17, '2A', 20000.00, 2, 0),
-(18, '3A', 5000.00, 2, 0);
+(15, '1A', 100000.00, 2, 0),
+(16, '1B', 100000.00, 2, 0),
+(17, '2A', 70000.00, 2, 0),
+(18, '3A', 50000.00, 2, 0);
 
 -- ------------------------------------------------------------------------------
 -- 6. EQUIPAJE

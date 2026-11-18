@@ -162,7 +162,7 @@ public class ReservaService {
                 }
                 asiento.setOcupado(true);
                 asientoRepository.save(asiento);
-                extras = extras.add(BigDecimal.valueOf(asiento.getPrecioExtra() != null ? asiento.getPrecioExtra() : 0));
+                extras = extras.add(BigDecimal.valueOf(AsientoService.precioExtraEfectivo(asiento)));
             }
 
             List<Integer> equipajeIds = p.getEquipajeIds() == null
@@ -184,9 +184,9 @@ public class ReservaService {
                 extras = extras.add(BigDecimal.valueOf(asistencia.getPrecio()));
             }
 
-            ClasesVuelo claseEfectiva = asiento != null && asiento.getCategoria() != null
-                    ? asiento.getCategoria()
-                    : p.getClasesVuelo();
+            ClasesVuelo claseEfectiva = asiento != null
+                    ? AsientoService.categoriaEfectiva(asiento)
+                    : ClasesVuelo.ECONOMICA;
 
             reserva.agregarPasaje(Pasaje.builder()
                     .codigoPasaje(UUID.randomUUID().toString().substring(0, 8).toUpperCase())

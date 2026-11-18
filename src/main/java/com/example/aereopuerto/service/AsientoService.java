@@ -31,7 +31,7 @@ public class AsientoService {
     private static final List<String> LETRAS_RESTO = List.of("A", "B", "C", "D", "E", "F"); // fila 7+: económica
     static final double PRECIO_EXTRA_PRIMERA = 45000;
     static final double PRECIO_EXTRA_EJECUTIVA = 15000;
-    static final double PRECIO_EXTRA_ECONOMICA = 0;
+    static final double PRECIO_EXTRA_ECONOMICA = 5000;
 
     private static final Pattern FILA_LETRA = Pattern.compile("^(\\d+)([A-Z]*)$");
 
@@ -74,6 +74,16 @@ public class AsientoService {
         if (fila > 0 && fila <= ULTIMA_FILA_PRIMERA) return ClasesVuelo.PRIMERA;
         if (fila > 0 && fila <= ULTIMA_FILA_EJECUTIVA) return ClasesVuelo.BUSINESS;
         return ClasesVuelo.ECONOMICA;
+    }
+
+    /** Precio extra efectivo al elegir el asiento (asigna 5000 a Económica si en BD figuraba en 0). */
+    public static double precioExtraEfectivo(Asiento asiento) {
+        if (asiento == null) return 0;
+        Double extra = asiento.getPrecioExtra();
+        if (extra != null && extra > 0) {
+            return extra;
+        }
+        return categoriaEfectiva(asiento) == ClasesVuelo.ECONOMICA ? PRECIO_EXTRA_ECONOMICA : 0;
     }
 
     /**
@@ -523,18 +533,13 @@ public class AsientoService {
             throw new AsientoInvalidoException("No hay asientos disponibles en este vuelo");
         }
 
-        ClasesVuelo objetivo = clasePreferida == ClasesVuelo.TURISTA ? ClasesVuelo.ECONOMICA
-                : (clasePreferida != null ? clasePreferida : ClasesVuelo.ECONOMICA);
-
-        List<Asiento> porClase = libres.stream()
-                .filter(a -> categoriaEfectiva(a) == objetivo)
-                .toList();
-        if (porClase.isEmpty() && objetivo != ClasesVuelo.ECONOMICA) {
-            porClase = libres.stream()
-                    .filter(a -> categoriaEfectiva(a) == ClasesVuelo.ECONOMICA)
-                    .toList();
+        // Quien no eligió asiento siempre recibe uno aleatorio de clase turista (Económica).
+        List<Asiento> pool = new ArrayList<>(libres.stream()
+                .filter(a -> categoriaEfectiva(a) == ClasesVuelo.ECONOMICA)
+                .toList());
+        if (pool.isEmpty()) {
+            throw new AsientoInvalidoException("No hay asientos economicos disponibles en este avion");
         }
-        List<Asiento> pool = new ArrayList<>(porClase.isEmpty() ? libres : porClase);
         Collections.shuffle(pool);
         Asiento elegido = pool.get(0);
         if (usaPropios) {
@@ -549,7 +554,7 @@ public class AsientoService {
         dto.setId(asiento.getId());
         dto.setCodigo(asiento.getCodigo());
         dto.setOcupado(ocupado);
-        dto.setPrecioExtra(asiento.getPrecioExtra());
+        dto.setPrecioExtra(precioExtraEfectivo(asiento));
         dto.setCategoria(categoriaEfectiva(asiento));
         if (asiento.getAvion() != null) {
             dto.setAvionId(asiento.getAvion().getId());

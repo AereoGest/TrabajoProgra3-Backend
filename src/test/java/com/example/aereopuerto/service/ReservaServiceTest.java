@@ -169,6 +169,63 @@ class ReservaServiceTest {
     }
 
     @Test
+    @DisplayName("crearReserva cobra $5.000 si elige asiento turista y $0 (clase turista) si no elige asiento")
+    void crearReserva_PrecioClaseTuristaVsSinSeleccionar() {
+        Asiento asientoEco = Asiento.builder()
+                .id(25)
+                .codigo("7A")
+                .ocupado(false)
+                .categoria(ClasesVuelo.ECONOMICA)
+                .precioExtra(5000.0)
+                .avion(avion)
+                .vuelo(vuelo)
+                .build();
+
+        PasajeRequest conAsiento = new PasajeRequest();
+        conAsiento.setClasesVuelo(ClasesVuelo.ECONOMICA);
+        conAsiento.setAsientoId(25);
+        conAsiento.setEquipajeIds(List.of());
+        conAsiento.setNombre("Juan");
+        conAsiento.setApellido("Pérez");
+        conAsiento.setTipoDocumento(Identificador.DNI);
+        conAsiento.setDocumento("35123456");
+        conAsiento.setFechaNacimiento(LocalDate.of(1990, 5, 15));
+
+        PasajeRequest sinAsiento = new PasajeRequest();
+        sinAsiento.setClasesVuelo(ClasesVuelo.PRIMERA); // sin asiento elegido debe quedar ECONOMICA y $0 extra
+        sinAsiento.setAsientoId(null);
+        sinAsiento.setEquipajeIds(List.of());
+        sinAsiento.setNombre("Ana");
+        sinAsiento.setApellido("Gómez");
+        sinAsiento.setTipoDocumento(Identificador.DNI);
+        sinAsiento.setDocumento("36123456");
+        sinAsiento.setFechaNacimiento(LocalDate.of(1992, 6, 10));
+
+        ReservaRequest request = new ReservaRequest();
+        request.setPersonaId(10);
+        request.setVueloId(5);
+        request.setCantidadPasajes(2);
+        request.setPasajes(List.of(conAsiento, sinAsiento));
+
+        when(personaRepository.findById(10)).thenReturn(Optional.of(cliente));
+        when(userRepository.findByPersonaId(10)).thenReturn(Optional.empty());
+        when(vueloRepository.findById(5)).thenReturn(Optional.of(vuelo));
+        when(pasajeRepository.countByVueloId(5)).thenReturn(0L);
+        when(reservaRepository.existsByCodigoReserva(anyString())).thenReturn(false);
+        when(asientoRepository.findById(25)).thenReturn(Optional.of(asientoEco));
+        when(equipajeRepository.findAllById(any())).thenReturn(List.of());
+        when(reservaRepository.save(any(Reserva.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Reserva resultado = reservaService.crearReserva(request);
+
+        // base = 200000, extras = 5000 (solo asientoEco), imp = 42000, subtotal = 247000, serv = 12350 -> 259350
+        assertThat(resultado.getValor()).isEqualByComparingTo("259350");
+        assertThat(resultado.getPasajes().get(0).getClasesVuelo()).isEqualTo(ClasesVuelo.ECONOMICA);
+        assertThat(resultado.getPasajes().get(1).getAsiento()).isNull();
+        assertThat(resultado.getPasajes().get(1).getClasesVuelo()).isEqualTo(ClasesVuelo.ECONOMICA);
+    }
+
+    @Test
     @DisplayName("crearReserva rechaza vuelo cancelado")
     void crearReserva_VueloCancelado_LanzaReservaInvalidaException() {
         vuelo.setEstado(estadoVuelo.CANCELADO);

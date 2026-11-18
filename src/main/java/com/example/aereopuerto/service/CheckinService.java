@@ -143,11 +143,11 @@ public class CheckinService {
                 Set<Integer> ocupados = ocupadosPorVuelo.computeIfAbsent(vuelo.getId(),
                         id -> new HashSet<>(pasajeRepository.findAsientosOcupadosPorVuelo(id, EstadoReserva.CANCELADA)));
 
-                List<Asiento> libres = asientosDisponiblesParaCheckin(vuelo, pasaje.getClasesVuelo(), ocupados);
+                List<Asiento> libres = asientosDisponiblesParaCheckin(vuelo, ocupados);
 
                 if (libres.isEmpty()) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT,
-                            "No quedan asientos libres en el vuelo " + vuelo.getId());
+                            "No quedan asientos de clase turista libres en el vuelo " + vuelo.getId());
                 }
 
                 Asiento elegido = libres.get(ThreadLocalRandom.current().nextInt(libres.size()));
@@ -212,34 +212,17 @@ public class CheckinService {
         return aeropuerto.getCiudad() + " (" + aeropuerto.getCodigoIata() + ")";
     }
 
-    private List<Asiento> asientosDisponiblesParaCheckin(
-            Vuelo vuelo, ClasesVuelo clasePasaje, Set<Integer> ocupados) {
+    /** Si el pasajero no eligió asiento, el aleatorio del check-in siempre se asigna en clase turista (Económica). */
+    private List<Asiento> asientosDisponiblesParaCheckin(Vuelo vuelo, Set<Integer> ocupados) {
         List<Asiento> candidatos = asientoRepository.findByVueloId(vuelo.getId());
         boolean usaPropios = !candidatos.isEmpty();
         if (!usaPropios && vuelo.getAvion() != null) {
             candidatos = asientoRepository.findByAvionIdAndVueloIsNull(vuelo.getAvion().getId());
         }
 
-        List<Asiento> disponibles = candidatos.stream()
+        return candidatos.stream()
                 .filter(a -> !ocupados.contains(a.getId()) && (!usaPropios || !Boolean.TRUE.equals(a.getOcupado())))
+                .filter(a -> AsientoService.categoriaEfectiva(a) == ClasesVuelo.ECONOMICA)
                 .toList();
-
-        ClasesVuelo objetivo = clasePasaje == ClasesVuelo.TURISTA || clasePasaje == null
-                ? ClasesVuelo.ECONOMICA
-                : clasePasaje;
-
-        List<Asiento> porClase = disponibles.stream()
-                .filter(a -> AsientoService.categoriaEfectiva(a) == objetivo)
-                .toList();
-        if (!porClase.isEmpty()) {
-            return porClase;
-        }
-        if (objetivo != ClasesVuelo.ECONOMICA) {
-            List<Asiento> economicos = disponibles.stream()
-                    .filter(a -> AsientoService.categoriaEfectiva(a) == ClasesVuelo.ECONOMICA)
-                    .toList();
-            if (!economicos.isEmpty()) return economicos;
-        }
-        return disponibles;
     }
 }

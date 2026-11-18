@@ -206,7 +206,30 @@ class AsientoServiceTest {
         assertFalse(resultado.get(0).getOcupado());
         assertEquals("2A", resultado.get(1).getCodigo());
         assertEquals(ClasesVuelo.ECONOMICA, resultado.get(1).getCategoria());
+        assertEquals(5000.0, resultado.get(1).getPrecioExtra());
         assertTrue(resultado.get(1).getOcupado());
+    }
+
+    @Test
+    @DisplayName("asignarAleatorioParaVuelo siempre asigna un asiento de clase turista (Económica)")
+    void asignarAleatorioParaVuelo_siempreEligeEconomica() {
+        Avion av = avion(100);
+        Vuelo vuelo = Vuelo.builder().id(10).avion(av).build();
+
+        Asiento primera = Asiento.builder().id(1).codigo("1A").avion(av).vuelo(vuelo)
+                .categoria(ClasesVuelo.PRIMERA).precioExtra(45000.0).ocupado(false).build();
+        Asiento eco = Asiento.builder().id(2).codigo("3A").avion(av).vuelo(vuelo)
+                .categoria(ClasesVuelo.ECONOMICA).precioExtra(5000.0).ocupado(false).build();
+
+        when(asientoRepository.findByVueloId(10)).thenReturn(List.of(primera, eco));
+        when(pasajeRepository.findAsientosOcupadosPorVuelo(10, EstadoReserva.CANCELADA)).thenReturn(List.of());
+        when(asientoRepository.save(any(Asiento.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Asiento asignado = asientoService.asignarAleatorioParaVuelo(vuelo, ClasesVuelo.PRIMERA);
+
+        assertEquals(2, asignado.getId());
+        assertEquals(ClasesVuelo.ECONOMICA, asignado.getCategoria());
+        assertTrue(asignado.getOcupado());
     }
 
     @Test

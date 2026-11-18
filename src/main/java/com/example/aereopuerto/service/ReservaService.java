@@ -84,8 +84,11 @@ public class ReservaService {
         return reservas;
     }
 
-    @Cacheable(value = "reservas", key = "'persona_' + #usuarioAutenticado.persona.id")
+    @Cacheable(value = "reservas", key = "'persona_' + (#usuarioAutenticado != null && #usuarioAutenticado.persona != null ? #usuarioAutenticado.persona.id : 0)")
     public List<Reserva> obtenerMisReservas(User usuarioAutenticado) {
+        if (usuarioAutenticado == null || usuarioAutenticado.getPersona() == null) {
+            return List.of();
+        }
         Persona persona = usuarioAutenticado.getPersona();
         return reservaRepository.findByPersona(persona);
     }

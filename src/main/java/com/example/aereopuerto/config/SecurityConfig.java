@@ -53,7 +53,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
                         // Rutas propias de reservas del cliente autenticado
-                        .requestMatchers("/api/reservas/mis-reservas/**", "/api/reservas/cancelar/**").hasAnyRole("USUARIO", "EMPLEADO", "ADMIN")
+                        .requestMatchers(
+                                "/api/reservas/mis-reservas",
+                                "/api/reservas/mis-reservas/**",
+                                "/api/reservas/cancelar/**"
+                        ).hasAnyRole("USUARIO", "USER", "EMPLEADO", "ADMIN")
 
                         // Check-in en mostrador: reservado a empleados y administradores
                         .requestMatchers("/api/reservas/check-in/**").hasAnyRole("EMPLEADO", "ADMIN")

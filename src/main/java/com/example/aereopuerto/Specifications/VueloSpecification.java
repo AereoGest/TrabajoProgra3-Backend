@@ -4,7 +4,10 @@ import com.example.aereopuerto.model.Vuelo;
 import com.example.aereopuerto.model.enums.estadoVuelo;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 
 public class VueloSpecification {
 
@@ -83,6 +86,21 @@ public class VueloSpecification {
                             criteriaBuilder.lower(root.get("aeropuertoOrigen").get("pais")), pattern),
                     criteriaBuilder.like(
                             criteriaBuilder.lower(root.get("aeropuertoOrigen").get("codigoIata")), pattern));
+        };
+    }
+
+    public static Specification<Vuelo> noSalio() {
+        return (root, query, cb) -> {
+            ZoneId zona = ZoneId.of("America/Argentina/Buenos_Aires");
+            LocalDate hoy = LocalDate.now(zona);
+            LocalTime ahora = LocalTime.now(zona);
+            return cb.or(
+                    cb.greaterThan(root.get("fechaSalida"), hoy),
+                    cb.and(
+                            cb.equal(root.get("fechaSalida"), hoy),
+                            cb.greaterThan(root.get("horaSalida"), ahora)
+                    )
+            );
         };
     }
 

@@ -22,6 +22,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @RestController
@@ -57,7 +58,11 @@ public class VueloController {
         @ApiResponse(responseCode = "200", description = "Lista devuelta exitosamente")
         @GetMapping("/disponibles")
         public ResponseEntity<List<Vuelo>> obtenerVuelosDisponibles() {
-                return ResponseEntity.ok(vueloService.obtenerVuelosCliente());
+            LocalDateTime ahora = LocalDateTime.now(ZoneId.of("America/Argentina/Buenos_Aires"));
+            List<Vuelo> vuelos = vueloService.obtenerVuelosCliente().stream()
+                    .filter(v -> LocalDateTime.of(v.getFechaSalida(), v.getHoraSalida()).isAfter(ahora))
+                    .toList();
+            return ResponseEntity.ok(vuelos);
         }
 
         @PreAuthorize("hasRole('ADMIN')")

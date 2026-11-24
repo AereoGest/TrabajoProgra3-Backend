@@ -2,6 +2,7 @@ package com.example.aereopuerto.auth.service;
 
 import com.example.aereopuerto.Specifications.UserSpecification;
 import com.example.aereopuerto.auth.dto.ActualizarClienteAdminRequest;
+import com.example.aereopuerto.auth.dto.CompletarPerfilRequest;
 import com.example.aereopuerto.auth.dto.CrearClienteAdminRequest;
 import com.example.aereopuerto.auth.dto.UsuarioResponse;
 import com.example.aereopuerto.auth.entity.Role;
@@ -24,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -91,6 +93,7 @@ public class UserService {
         if (request.getRole() == Role.ROLE_INCOMPLETO) {
             throw new IllegalArgumentException("No se puede crear un cliente con rol INCOMPLETO");
         }
+        validarFechaNacimiento(request.getFechaNacimiento());
 
         String email = request.getEmail().trim().toLowerCase();
         if (userRepository.existsByEmail(email)) {
@@ -136,6 +139,7 @@ public class UserService {
         if (request.getRole() == Role.ROLE_INCOMPLETO) {
             throw new IllegalArgumentException("No se puede asignar el rol INCOMPLETO");
         }
+        validarFechaNacimiento(request.getFechaNacimiento());
 
         String newEmail = request.getEmail().trim().toLowerCase();
         if (!user.getEmail().equalsIgnoreCase(newEmail) && userRepository.existsByEmail(newEmail)) {
@@ -179,6 +183,18 @@ public class UserService {
 
         user = userRepository.save(user);
         return authService.mapearUsuarioResponse(user);
+    }
+
+    private void validarFechaNacimiento(LocalDate fechaNacimiento) {
+        if (fechaNacimiento == null) {
+            throw new IllegalArgumentException("La fecha de nacimiento es obligatoria");
+        }
+        if (fechaNacimiento.isBefore(CompletarPerfilRequest.FECHA_NACIMIENTO_MINIMA)) {
+            throw new IllegalArgumentException("La fecha de nacimiento no puede ser anterior al 01/01/1900");
+        }
+        if (!fechaNacimiento.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("La fecha de nacimiento debe ser anterior a hoy");
+        }
     }
 
     @Transactional

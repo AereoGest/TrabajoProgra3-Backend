@@ -2,6 +2,7 @@ package com.example.aereopuerto.service;
 
 import com.example.aereopuerto.Exceptions.PersonaInvalidaException;
 import com.example.aereopuerto.Specifications.PersonaSpecification;
+import com.example.aereopuerto.auth.dto.CompletarPerfilRequest;
 import com.example.aereopuerto.auth.repository.UserRepository;
 import com.example.aereopuerto.model.Persona;
 import com.example.aereopuerto.model.enums.Identificador;
@@ -17,6 +18,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.sql.Date;
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -52,6 +54,9 @@ public class PersonaService {
     @CachePut(value = "clientes", key = "#result.id")
     @CacheEvict(value = "clientes", key = "'todos'")
     public Persona crearCliente(Persona persona) {
+        if (persona != null && persona.getFechaNacimiento() != null) {
+            validarFechaNacimiento(persona.getFechaNacimiento());
+        }
         return personaRepository.save(persona);
     }
 
@@ -61,6 +66,11 @@ public class PersonaService {
 
         Persona c = personaRepository.findById(id)
                 .orElseThrow(() -> new PersonaInvalidaException("Persona no encontrado. ID: " + id));
+
+        if (persona.getFechaNacimiento() != null) {
+            validarFechaNacimiento(persona.getFechaNacimiento());
+            c.setFechaNacimiento(persona.getFechaNacimiento());
+        }
 
         c.setNombre(persona.getNombre());
         c.setApellido(persona.getApellido());
@@ -72,6 +82,15 @@ public class PersonaService {
         c.setSexo(persona.getSexo());
 
         return personaRepository.save(c);
+    }
+
+    private void validarFechaNacimiento(LocalDate fechaNacimiento) {
+        if (fechaNacimiento.isBefore(CompletarPerfilRequest.FECHA_NACIMIENTO_MINIMA)) {
+            throw new PersonaInvalidaException("La fecha de nacimiento no puede ser anterior al 01/01/1900");
+        }
+        if (!fechaNacimiento.isBefore(LocalDate.now())) {
+            throw new PersonaInvalidaException("La fecha de nacimiento debe ser anterior a hoy");
+        }
     }
 
     @Caching(evict = {

@@ -8,6 +8,10 @@ import lombok.Data;
 public class AeropuertoDTO {
 
     @NotBlank(message = "El nombre es obligatorio.")
+    @Pattern(
+            regexp = "^(?=(?:.*[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ]){4,})[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ ]+$",
+            message = "El nombre solo puede contener letras y espacios, con al menos 4 letras."
+    )
     private String nombre;
 
     @NotBlank(message = "El código IATA es obligatorio.")

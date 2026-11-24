@@ -2,6 +2,7 @@ package com.example.aereopuerto.auth.dto;
 
 import com.example.aereopuerto.model.enums.Identificador;
 import com.example.aereopuerto.model.enums.Sexo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
@@ -9,6 +10,8 @@ import java.time.LocalDate;
 
 @Data
 public class CompletarPerfilRequest {
+
+    public static final LocalDate FECHA_NACIMIENTO_MINIMA = LocalDate.of(1900, 1, 1);
 
     @NotBlank(message = "El nombre es obligatorio.")
     @Pattern(regexp = "^[a-zA-ZáéíóúÁÉÍÓÚñÑ ]+$", message = "El nombre solo puede contener letras y espacios.")
@@ -31,6 +34,12 @@ public class CompletarPerfilRequest {
     @NotNull(message = "La fecha de nacimiento es obligatoria.")
     @Past(message = "La fecha de nacimiento debe ser anterior a la fecha actual.")
     private LocalDate fechaNacimiento;
+
+    @JsonIgnore
+    @AssertTrue(message = "La fecha de nacimiento no puede ser anterior al 01/01/1900.")
+    public boolean isFechaNacimientoMinimaValida() {
+        return fechaNacimiento == null || !fechaNacimiento.isBefore(FECHA_NACIMIENTO_MINIMA);
+    }
 
     @NotBlank(message = "El teléfono es obligatorio.")
     @Pattern(

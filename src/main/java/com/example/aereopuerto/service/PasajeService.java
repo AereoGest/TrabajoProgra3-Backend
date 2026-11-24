@@ -275,6 +275,9 @@ public class PasajeService {
         if (dto.getFechaNacimiento() != null && !dto.getFechaNacimiento().isBefore(LocalDate.now())) {
             throw new ReservaInvalidaException("La fecha de nacimiento debe ser anterior a hoy");
         }
+        if (dto.getFechaNacimiento() != null && dto.getFechaNacimiento().isBefore(LocalDate.of(1900, 1, 1))) {
+            throw new ReservaInvalidaException("La fecha de nacimiento no puede ser anterior al 01/01/1900");
+        }
 
         if (reserva.getPasajes() != null) {
             for (Pasaje otro : reserva.getPasajes()) {

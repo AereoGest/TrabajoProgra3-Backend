@@ -323,6 +323,33 @@ class ReservaServiceTest {
     }
 
     @Test
+    @DisplayName("crearReserva rechaza pasajero con fecha de nacimiento anterior al 01/01/1900")
+    void crearReserva_FechaNacimientoAnteriorA1900_LanzaReservaInvalidaException() {
+        PasajeRequest pasajeReq = new PasajeRequest();
+        pasajeReq.setClasesVuelo(ClasesVuelo.ECONOMICA);
+        pasajeReq.setNombre("Juan");
+        pasajeReq.setApellido("Pérez");
+        pasajeReq.setTipoDocumento(Identificador.DNI);
+        pasajeReq.setDocumento("35123456");
+        pasajeReq.setFechaNacimiento(LocalDate.of(1895, 5, 15));
+
+        ReservaRequest request = new ReservaRequest();
+        request.setPersonaId(10);
+        request.setVueloId(5);
+        request.setCantidadPasajes(1);
+        request.setPasajes(List.of(pasajeReq));
+
+        when(personaRepository.findById(10)).thenReturn(Optional.of(cliente));
+        when(userRepository.findByPersonaId(10)).thenReturn(Optional.empty());
+        when(vueloRepository.findById(5)).thenReturn(Optional.of(vuelo));
+        when(pasajeRepository.countByVueloId(5)).thenReturn(0L);
+
+        assertThatThrownBy(() -> reservaService.crearReserva(request))
+                .isInstanceOf(ReservaInvalidaException.class)
+                .hasMessageContaining("1900");
+    }
+
+    @Test
     @DisplayName("actualizarReserva actualiza titular, estado y valor manteniendo la cantidad real de pasajes")
     void actualizarReserva_DatosValidos_ActualizaCamposCorrectamente() {
         Persona nuevoTitular = Persona.builder()

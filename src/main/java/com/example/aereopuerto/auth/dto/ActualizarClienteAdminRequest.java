@@ -3,6 +3,8 @@ package com.example.aereopuerto.auth.dto;
 import com.example.aereopuerto.auth.entity.Role;
 import com.example.aereopuerto.model.enums.Identificador;
 import com.example.aereopuerto.model.enums.Sexo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -39,6 +41,12 @@ public class ActualizarClienteAdminRequest {
     @NotNull(message = "La fecha de nacimiento es obligatoria")
     @Past(message = "La fecha de nacimiento debe ser anterior a hoy")
     private LocalDate fechaNacimiento;
+
+    @JsonIgnore
+    @AssertTrue(message = "La fecha de nacimiento no puede ser anterior al 01/01/1900")
+    public boolean isFechaNacimientoMinimaValida() {
+        return fechaNacimiento == null || !fechaNacimiento.isBefore(CompletarPerfilRequest.FECHA_NACIMIENTO_MINIMA);
+    }
 
     @NotNull(message = "El sexo es obligatorio")
     private Sexo sexo;

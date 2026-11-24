@@ -14,6 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -211,6 +212,12 @@ public class AuthService {
             throw new IllegalArgumentException(
                     "Todos los campos son obligatorios"
             );
+        }
+        if (request.getFechaNacimiento().isBefore(CompletarPerfilRequest.FECHA_NACIMIENTO_MINIMA)) {
+            throw new IllegalArgumentException("La fecha de nacimiento no puede ser anterior al 01/01/1900.");
+        }
+        if (!request.getFechaNacimiento().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("La fecha de nacimiento debe ser anterior a la fecha actual.");
         }
     }
 

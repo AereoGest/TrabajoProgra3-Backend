@@ -31,6 +31,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.Year;
@@ -339,6 +340,17 @@ public class ReservaService {
             if (!documentos.add(p.getTipoDocumento() + "-" + p.getDocumento())) {
                 throw new ReservaInvalidaException(
                         "Pasajero " + nro + ": el documento " + p.getDocumento() + " está repetido en la reserva");
+            }
+
+            if (p.getFechaNacimiento() != null) {
+                if (p.getFechaNacimiento().isBefore(LocalDate.of(1900, 1, 1))) {
+                    throw new ReservaInvalidaException(
+                            "Pasajero " + nro + ": la fecha de nacimiento no puede ser anterior al 01/01/1900");
+                }
+                if (!p.getFechaNacimiento().isBefore(LocalDate.now())) {
+                    throw new ReservaInvalidaException(
+                            "Pasajero " + nro + ": la fecha de nacimiento debe ser anterior a hoy");
+                }
             }
 
             if (p.getAsientoId() != null && !asientos.add(p.getAsientoId())) {

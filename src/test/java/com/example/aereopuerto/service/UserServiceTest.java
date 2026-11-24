@@ -191,6 +191,28 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("crearCliente: rechaza fecha de nacimiento anterior al 01/01/1900")
+    void crearCliente_fechaNacimientoAnteriorA1900_lanzaExcepcion() {
+        CrearClienteAdminRequest req = CrearClienteAdminRequest.builder()
+                .nombre("Carlos")
+                .apellido("Gómez")
+                .identificador(Identificador.DNI)
+                .numeroIdentificador("40123456")
+                .fechaNacimiento(LocalDate.of(1899, 12, 31))
+                .sexo(Sexo.MASCULINO)
+                .email("carlos@example.com")
+                .telefono("1155556666")
+                .password("secreto123")
+                .role(Role.ROLE_USUARIO)
+                .build();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> userService.crearCliente(req));
+        assertTrue(ex.getMessage().contains("1900"));
+        verify(personaRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("actualizarCliente: modifica datos personales y de cuenta correctamente")
     void actualizarCliente_exitoso() {
         ActualizarClienteAdminRequest req = ActualizarClienteAdminRequest.builder()

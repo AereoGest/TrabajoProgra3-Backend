@@ -28,6 +28,7 @@ public class CarritoService {
     private final CarritoItemRepository carritoItemRepository;
     private final PersonaRepository personaRepository;
     private final VueloRepository vueloRepository;
+    private final AsientoService asientoService;
     private final UsuarioAutenticadoService usuarioAutenticadoService;
 
     public CarritoDTO getCarritoByPersonaId(Integer personaId) {
@@ -48,6 +49,13 @@ public class CarritoService {
         if (cantidad <= 0) {
             throw new CarritoInvalidoException("La cantidad debe ser mayor a 0.");
         }
+
+        // Pasajes de este vuelo que ya están en el carrito (en cualquier clase) + los nuevos
+        int yaEnCarrito = carrito.getItems().stream()
+                .filter(i -> i.getVuelo().getId().equals(vueloId))
+                .mapToInt(CarritoItem::getCantidad)
+                .sum();
+        validarAsientosDisponibles(vueloId, yaEnCarrito + cantidad);
 
         var existing = carrito.getItems().stream()
                 .filter(i -> i.getVuelo().getId().equals(vueloId) && i.getClaseVuelo() == clase)
@@ -78,6 +86,15 @@ public class CarritoService {
                 .orElseThrow(() -> new CarritoInvalidoException("Item del carrito no encontrado con id: " + itemId));
         if (!item.getCarrito().getPersona().getId().equals(personaId)) {
             throw new CarritoInvalidoException("El item no pertenece al usuario autenticado.");
+        }
+        // Solo se valida al aumentar: bajar la cantidad siempre está permitido
+        if (cantidad > item.getCantidad()) {
+            Integer vueloId = item.getVuelo().getId();
+            int otrosItemsDelVuelo = item.getCarrito().getItems().stream()
+                    .filter(i -> i.getVuelo().getId().equals(vueloId) && !i.getId().equals(itemId))
+                    .mapToInt(CarritoItem::getCantidad)
+                    .sum();
+            validarAsientosDisponibles(vueloId, otrosItemsDelVuelo + cantidad);
         }
         item.setCantidad(cantidad);
         return mapItemToDTO(carritoItemRepository.save(item));
@@ -162,6 +179,20 @@ public class CarritoService {
         dto.setVueloId(item.getVuelo().getId());
         dto.setCantidad(item.getCantidad());
         dto.setClaseVuelo(item.getClaseVuelo());
+        dto.setAsientosDisponibles(asientoService.contarAsientosLibres(item.getVuelo().getId()));
         return dto;
+    }
+
+    /** Impide pedir más pasajes que asientos libres quedan en el vuelo. */
+    private void validarAsientosDisponibles(Integer vueloId, int pasajesPedidos) {
+        int libres = asientoService.contarAsientosLibres(vueloId);
+        if (libres == 0) {
+            throw new CarritoInvalidoException("No quedan asientos disponibles en este vuelo.");
+        }
+        if (pasajesPedidos > libres) {
+            throw new CarritoInvalidoException(
+                    "Solo quedan " + libres + (libres == 1 ? " asiento disponible" : " asientos disponibles")
+                            + " en este vuelo.");
+        }
     }
 }

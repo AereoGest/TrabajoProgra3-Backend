@@ -497,6 +497,13 @@ public class AsientoService {
                 .toList();
     }
 
+    /** Cantidad de asientos libres del vuelo, de cualquier clase (el pasajero puede elegir cualquiera). */
+    public int contarAsientosLibres(Integer vueloId) {
+        return (int) obtenerAsientosPorVuelo(vueloId).stream()
+                .filter(a -> !Boolean.TRUE.equals(a.getOcupado()))
+                .count();
+    }
+
     public Map<Integer, Boolean> verificarDisponibilidad(List<Integer> ids) {
         Map<Integer, Boolean> resultado = new HashMap<>();
         for (Integer id : ids) {

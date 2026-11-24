@@ -128,6 +128,12 @@ public class SecurityConfig {
                                 "/api/equipajes"
                         ).hasAnyRole("USUARIO", "EMPLEADO", "ADMIN", "INCOMPLETO")
 
+                        // Alta, modificación y baja de aeropuertos: solo administradores
+                        .requestMatchers(HttpMethod.POST, "/api/aeropuertos", "/api/aeropuertos/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/aeropuertos/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/aeropuertos/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/aeropuertos/**").hasRole("ADMIN")
+
                         .requestMatchers(
                                 "/api/aviones/**",
                                 "/api/aeropuertos/**"

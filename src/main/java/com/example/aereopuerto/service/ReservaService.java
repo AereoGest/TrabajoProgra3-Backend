@@ -32,6 +32,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.Year;
 import java.util.*;
 
@@ -412,7 +413,7 @@ public class ReservaService {
 
         if (reservaDTO.getEstadoReserva() == EstadoReserva.CANCELADA
                 && reserva.getEstadoReserva() != EstadoReserva.CANCELADA) {
-            registrarReembolso(reserva, MOTIVO_CANCELADA_POR_AEROLINEA);
+            registrarReembolso(reserva, MOTIVO_CANCELADA_POR_AEROLINEA, true);
             liberarAsientosYCancelar(reserva);
         } else {
             reserva.setEstadoReserva(reservaDTO.getEstadoReserva());
@@ -435,30 +436,28 @@ public class ReservaService {
         }
     }
 
-    /** Cancelación hecha por un admin o empleado (ej. DELETE /api/reservas/{id}). */
+    /** Cancelación hecha por un admin desde el panel (DELETE /api/reservas/{id}): devuelve el 100%. */
     @Transactional
     @CacheEvict(value = "reservas", allEntries = true)
     public void cancelarReserva(Integer id) {
-        cancelarReserva(id, MOTIVO_CANCELADA_POR_AEROLINEA);
+        cancelarReserva(id, MOTIVO_CANCELADA_POR_AEROLINEA, true);
     }
 
     /**
-     * Cancela la reserva, libera sus asientos y guarda en la reserva el reembolso que corresponde
-     * según la política de devolución (días hasta el vuelo) y el motivo, para que lo vean el cliente y el admin.
+     * Cancela la reserva, libera sus asientos y guarda el reembolso y el motivo.
+     * devolverTotal = true -> 100% de lo pagado (admin); false -> según la política de días.
      */
     @Transactional
     @CacheEvict(value = "reservas", allEntries = true)
-    public void cancelarReserva(Integer id, String motivo) {
-
+    public void cancelarReserva(Integer id, String motivo, boolean devolverTotal) {
         Reserva reserva = reservaRepository.findById(id)
                 .orElseThrow(() -> new ReservaInvalidaException("Reserva no encontrada"));
 
         if (reserva.getEstadoReserva() == EstadoReserva.CANCELADA) {
-            throw new ReservaInvalidaException(
-                    "La reserva ya se encuentra cancelada");
+            throw new ReservaInvalidaException("La reserva ya se encuentra cancelada");
         }
 
-        registrarReembolso(reserva, motivo);
+        registrarReembolso(reserva, motivo, devolverTotal);
         liberarAsientosYCancelar(reserva);
     }
 
@@ -467,19 +466,64 @@ public class ReservaService {
     public void cancelarReservaPorUsuario(Integer id, User usuarioAutenticado) {
         Reserva reserva = reservaRepository.findById(id)
                 .orElseThrow(() -> new ReservaInvalidaException("Reserva no encontrada"));
-        boolean esAdminOEmpleado = usuarioAutenticado.getRole() == Role.ROLE_ADMIN
-                || usuarioAutenticado.getRole() == Role.ROLE_EMPLEADO;
+        boolean esAdmin = usuarioAutenticado.getRole() == Role.ROLE_ADMIN;
+        boolean esAdminOEmpleado = esAdmin || usuarioAutenticado.getRole() == Role.ROLE_EMPLEADO;
+        boolean esPropia = reserva.getPersona().getId().equals(usuarioAutenticado.getPersona().getId());
+
+        if (!esAdminOEmpleado && !esPropia) {
+            throw new ReservaInvalidaException("La reserva no pertenece al usuario autenticado.");
+        }
+        if (vueloYaSalio(reserva)) {
+            throw new ReservaInvalidaException("No se puede cancelar una reserva de un vuelo que ya salió.");
+        }
+
+        if (esAdmin) {
+            // Admin: cancela la aerolínea y se devuelve el 100%
+            cancelarReserva(id, MOTIVO_CANCELADA_POR_AEROLINEA, true);
+        } else {
+            // Usuario o empleado: se aplica la política de días
+            cancelarReserva(id, esPropia ? MOTIVO_CANCELADA_POR_CLIENTE : MOTIVO_CANCELADA_POR_AEROLINEA, false);
+        }
+    }
+
+    /** true si el vuelo de la reserva ya salió (fecha y hora de salida anteriores a ahora). */
+    private boolean vueloYaSalio(Reserva reserva) {
+        if (reserva.getPasajes() == null) return false;
+        return reserva.getPasajes().stream()
+                .map(Pasaje::getVuelo)
+                .filter(Objects::nonNull)
+                .filter(v -> v.getFechaSalida() != null)
+                .anyMatch(v -> LocalDateTime.of(
+                        v.getFechaSalida(),
+                        v.getHoraSalida() != null ? v.getHoraSalida() : LocalTime.MIDNIGHT
+                ).isBefore(LocalDateTime.now()));
+    }
+
+    /** Cuánto se devolvería si se cancela ahora (no modifica nada). Admin: 100%; resto: política de días. */
+    @Transactional
+    public ReembolsoDTO simularReembolso(Integer id, User usuarioAutenticado) {
+        Reserva reserva = reservaRepository.findById(id)
+                .orElseThrow(() -> new ReservaInvalidaException("Reserva no encontrada"));
+        boolean esAdmin = usuarioAutenticado.getRole() == Role.ROLE_ADMIN;
+        boolean esAdminOEmpleado = esAdmin || usuarioAutenticado.getRole() == Role.ROLE_EMPLEADO;
         if (!esAdminOEmpleado && !reserva.getPersona().getId().equals(usuarioAutenticado.getPersona().getId())) {
             throw new ReservaInvalidaException("La reserva no pertenece al usuario autenticado.");
         }
-        cancelarReserva(id, esAdminOEmpleado ? MOTIVO_CANCELADA_POR_AEROLINEA : MOTIVO_CANCELADA_POR_CLIENTE);
+        return esAdmin ? politicaService.simularTotal(reserva) : politicaService.simular(reserva);
     }
 
-    /** Calcula el reembolso con la política de devolución y lo deja registrado en la reserva junto al motivo. */
-    private void registrarReembolso(Reserva reserva, String motivo) {
-        BigDecimal reembolso = politicaService.calcular(reserva);
+    /** Calcula el reembolso y lo deja registrado en la reserva junto al motivo. */
+    private void registrarReembolso(Reserva reserva, String motivo, boolean devolverTotal) {
+        BigDecimal reembolso = devolverTotal ? totalPagado(reserva) : politicaService.calcular(reserva);
         reserva.setMontoReembolso(reembolso != null ? reembolso : BigDecimal.ZERO);
         reserva.setMotivoCancelacion(motivo);
+    }
+
+    /** Todo lo que pagó el cliente (0 si la reserva no estaba pagada). */
+    private static BigDecimal totalPagado(Reserva reserva) {
+        boolean pagada = reserva.getEstadoReserva() == EstadoReserva.CONFIRMADO
+                || reserva.getEstadoReserva() == EstadoReserva.ACTIVO;
+        return pagada && reserva.getValor() != null ? reserva.getValor() : BigDecimal.ZERO;
     }
 
     private void crearFactura(Reserva reserva, PagoRequest pago, String cuil) {

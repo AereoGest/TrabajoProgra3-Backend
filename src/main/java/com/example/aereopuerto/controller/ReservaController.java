@@ -1,13 +1,7 @@
 package com.example.aereopuerto.controller;
 
 import com.example.aereopuerto.auth.entity.User;
-import com.example.aereopuerto.dto.CheckinMostradorRequest;
-import com.example.aereopuerto.dto.Checkinresponsedto;
-import com.example.aereopuerto.dto.PagoRequest;
-import com.example.aereopuerto.dto.PagoResponse;
-import com.example.aereopuerto.dto.ReservaCheckinDTO;
-import com.example.aereopuerto.dto.ReservaDTO;
-import com.example.aereopuerto.dto.ReservaRequest;
+import com.example.aereopuerto.dto.*;
 import com.example.aereopuerto.model.Reserva;
 import com.example.aereopuerto.model.enums.EstadoReserva;
 import com.example.aereopuerto.service.CheckinService;
@@ -85,6 +79,14 @@ public class ReservaController {
             @AuthenticationPrincipal User usuarioAutenticado) {
         return ResponseEntity.ok(
                 checkinService.hacerCheckIn(id, usuarioAutenticado.getPersona().getId()));
+    }
+
+    @Operation(summary = "Ver cuánto me devuelven si cancelo")
+    @GetMapping("/mis-reservas/{id}/reembolso")
+    public ResponseEntity<ReembolsoDTO> simularReembolso(
+            @PathVariable Integer id,
+            @AuthenticationPrincipal User usuarioAutenticado) {
+        return ResponseEntity.ok(reservaService.simularReembolso(id, usuarioAutenticado));
     }
 
     @Operation(summary = "Cancelar reserva", description = "Cancela una reserva existente.")

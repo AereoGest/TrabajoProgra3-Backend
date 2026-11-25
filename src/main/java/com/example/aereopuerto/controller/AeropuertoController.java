@@ -58,6 +58,7 @@ public class AeropuertoController {
             @ApiResponse(responseCode = "201", description = "Aeropuerto creado correctamente"),
             @ApiResponse(responseCode = "400", description = "Datos inválidos")
     })
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<Aeropuerto> crearAeropuerto(@Valid @RequestBody AeropuertoDTO aeropuerto) {
         Aeropuerto nuevo = aeropuertoService.crearAeropuerto(aeropuerto);
@@ -73,6 +74,7 @@ public class AeropuertoController {
             @ApiResponse(responseCode = "404", description = "Aeropuerto no encontrado"),
             @ApiResponse(responseCode = "400", description = "Datos inválidos")
     })
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<Aeropuerto> actualizarAeropuerto(
             @PathVariable Integer id,
@@ -88,6 +90,7 @@ public class AeropuertoController {
             @ApiResponse(responseCode = "204", description = "Aeropuerto eliminado correctamente"),
             @ApiResponse(responseCode = "404", description = "Aeropuerto no encontrado")
     })
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminarAeropuerto(@PathVariable Integer id) {
        aeropuertoService.eliminarAeropuerto(id);

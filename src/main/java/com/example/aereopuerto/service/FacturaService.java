@@ -1,6 +1,8 @@
 package com.example.aereopuerto.service;
 
 import com.example.aereopuerto.Exceptions.FacturaInvalidaException;
+import com.example.aereopuerto.auth.entity.Role;
+import com.example.aereopuerto.auth.entity.User;
 import com.example.aereopuerto.dto.FacturaDTO;
 import com.example.aereopuerto.model.Factura;
 import com.example.aereopuerto.model.Persona;
@@ -33,6 +35,30 @@ public class FacturaService {
 
     public Factura obtenerFacturaPorId(Integer id) {
         return facturaRepository.findById(id).orElseThrow(() -> new FacturaInvalidaException("Factura no encontrada. ID: " + id));
+    }
+
+    /**
+     * Devuelve la factura solo si el usuario puede verla: el titular de la reserva,
+     * o un empleado/administrador. A cualquier otro le responde igual que si no existiera,
+     * para no revelar qué facturas hay en el sistema.
+     */
+    public Factura obtenerFacturaParaUsuario(Integer id, User usuario) {
+        Factura factura = obtenerFacturaPorId(id);
+        if (usuario == null) {
+            throw new FacturaInvalidaException("Factura no encontrada. ID: " + id);
+        }
+        boolean esPersonal = usuario.getRole() == Role.ROLE_ADMIN || usuario.getRole() == Role.ROLE_EMPLEADO;
+        if (esPersonal) {
+            return factura;
+        }
+        Persona titular = factura.getReserva() != null ? factura.getReserva().getPersona() : null;
+        Persona solicitante = usuario.getPersona();
+        boolean esPropia = titular != null && solicitante != null
+                && titular.getId() != null && titular.getId().equals(solicitante.getId());
+        if (!esPropia) {
+            throw new FacturaInvalidaException("Factura no encontrada. ID: " + id);
+        }
+        return factura;
     }
 
     public List<Factura> obtenerTodasLasFacturas() {

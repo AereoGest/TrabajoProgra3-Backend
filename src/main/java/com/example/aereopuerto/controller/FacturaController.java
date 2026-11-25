@@ -116,9 +116,14 @@ public class FacturaController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(
+            summary = "Descargar factura",
+            description = "Comprobante en HTML. Solo el titular de la reserva, empleados o administradores."
+    )
     @GetMapping("/{id}/download")
-    public ResponseEntity<String> descargarFactura(@PathVariable Integer id) {
-        Factura f = facturaService.obtenerFacturaPorId(id);
+    public ResponseEntity<String> descargarFactura(@PathVariable Integer id,
+                                                   @AuthenticationPrincipal User usuarioAutenticado) {
+        Factura f = facturaService.obtenerFacturaParaUsuario(id, usuarioAutenticado);
         String metodoLabel = switch (f.getMetodoDePago() != null ? f.getMetodoDePago().name() : "") {
             case "TARJETA_CREDITO" -> "Tarjeta de crédito";
             case "TARJETA_DEBITO" -> "Tarjeta de débito";

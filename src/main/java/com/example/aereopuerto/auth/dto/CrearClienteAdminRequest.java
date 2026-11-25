@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,10 +26,12 @@ public class CrearClienteAdminRequest {
 
     @NotBlank(message = "El nombre es obligatorio")
     @Size(max = 100, message = "El nombre no puede superar los 100 caracteres")
+    @Pattern(regexp = ReglasDatosPersonales.SOLO_LETRAS, message = "El nombre solo puede contener letras y espacios")
     private String nombre;
 
     @NotBlank(message = "El apellido es obligatorio")
     @Size(max = 100, message = "El apellido no puede superar los 100 caracteres")
+    @Pattern(regexp = ReglasDatosPersonales.SOLO_LETRAS, message = "El apellido solo puede contener letras y espacios")
     private String apellido;
 
     @NotNull(message = "El tipo de identificación es obligatorio")
@@ -37,6 +40,12 @@ public class CrearClienteAdminRequest {
     @NotBlank(message = "El número de documento es obligatorio")
     @Size(max = 50, message = "El documento no puede superar los 50 caracteres")
     private String numeroIdentificador;
+
+    @JsonIgnore
+    @AssertTrue(message = "El DNI debe tener 7 u 8 números y el pasaporte entre 6 y 20 letras mayúsculas o números")
+    public boolean isDocumentoValido() {
+        return ReglasDatosPersonales.documentoValido(identificador, numeroIdentificador);
+    }
 
     @NotNull(message = "La fecha de nacimiento es obligatoria")
     @Past(message = "La fecha de nacimiento debe ser anterior a hoy")
@@ -56,11 +65,11 @@ public class CrearClienteAdminRequest {
     private String email;
 
     @NotBlank(message = "El teléfono es obligatorio")
-    @Size(max = 50, message = "El teléfono no puede superar los 50 caracteres")
+    @Pattern(regexp = ReglasDatosPersonales.TELEFONO, message = "Ingrese un número de teléfono válido (10 dígitos, sin símbolos)")
     private String telefono;
 
     @NotBlank(message = "La contraseña es obligatoria")
-    @Size(min = 6, message = "La contraseña debe tener al menos 6 caracteres")
+    @Pattern(regexp = ReglasDatosPersonales.PASSWORD, message = ReglasDatosPersonales.MENSAJE_PASSWORD)
     private String password;
 
     @NotNull(message = "El rol es obligatorio")
